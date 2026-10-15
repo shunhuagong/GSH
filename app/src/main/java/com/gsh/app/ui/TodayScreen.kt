@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -36,6 +37,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -67,6 +69,7 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
     val targets by vm.targets.collectAsState()
     val isTrainingDay by vm.isTrainingDay.collectAsState()
     val dailyAnalysis by vm.dailyAnalysis.collectAsState()
+    val streak by vm.streak.collectAsState()
 
     var editingEntry by remember { mutableStateOf<MealEntry?>(null) }
 
@@ -94,7 +97,7 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { DateHeader(date = date, onChange = vm::selectDate) }
+        item { DateHeader(date = date, onChange = vm::selectDate, streak = streak) }
         item {
             DayTypeToggle(
                 isTraining = isTrainingDay,
@@ -147,7 +150,7 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DateHeader(date: String, onChange: (String) -> Unit) {
+private fun DateHeader(date: String, onChange: (String) -> Unit, streak: Int) {
     var showPicker by remember { mutableStateOf(false) }
 
     if (showPicker) {
@@ -185,6 +188,20 @@ private fun DateHeader(date: String, onChange: (String) -> Unit) {
             fontWeight = FontWeight.Bold,
             modifier = Modifier.clickable { showPicker = true }
         )
+        if (streak > 0) {
+            Spacer(Modifier.width(8.dp))
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.tertiaryContainer
+            ) {
+                Text(
+                    text = "🔥 $streak 天",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
+        }
         IconButton(onClick = { onChange(DateUtils.format(localDate.plusDays(1))) }) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "后一天")
         }

@@ -63,6 +63,25 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         repo.dailyTotalDao.observeDailyTotals()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** 连续记录天数：中断一天即归零；今天还没记但昨天有记录时，打卡仍在进行中。 */
+    val streak: StateFlow<Int> =
+        repo.dailyTotalDao.observeDailyTotals()
+            .map { totals -> computeStreak(totals.map { it.date }.toHashSet()) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    private fun computeStreak(dates: Set<String>): Int {
+        var day = DateUtils.parse(DateUtils.today())
+        if (!dates.contains(DateUtils.format(day))) {
+            day = day.minusDays(1)
+        }
+        var count = 0
+        while (dates.contains(DateUtils.format(day))) {
+            count++
+            day = day.minusDays(1)
+        }
+        return count
+    }
+
     // ---------- 目标 ----------
 
     val profile: StateFlow<UserProfile> = repo.settings.profile
