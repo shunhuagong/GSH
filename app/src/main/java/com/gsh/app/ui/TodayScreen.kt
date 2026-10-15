@@ -42,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,6 +73,22 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
     val streak by vm.streak.collectAsState()
 
     var editingEntry by remember { mutableStateOf<MealEntry?>(null) }
+    var celebrationTick by remember { mutableStateOf(0) }
+    var celebrated by remember { mutableStateOf(false) }
+
+    // 三大营养素全部达标时，触发一次庆祝彩带（删掉记录后重置，可再次触发）
+    val allMet = entries.isNotEmpty() &&
+        entries.sumOf { it.protein } >= targets.protein &&
+        entries.sumOf { it.carbs } >= targets.carbs &&
+        entries.sumOf { it.fat } >= targets.fat
+    LaunchedEffect(allMet) {
+        if (allMet && !celebrated) {
+            celebrated = true
+            celebrationTick++
+        } else if (!allMet) {
+            celebrated = false
+        }
+    }
 
     if (dailyAnalysis != AiUiState.Idle) {
         AiAnalysisSheet(
@@ -92,11 +109,12 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
         )
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
         item { DateHeader(date = date, onChange = vm::selectDate, streak = streak) }
         item {
             DayTypeToggle(
@@ -145,6 +163,11 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
                 )
             }
         }
+        }
+        ConfettiOverlay(
+            trigger = celebrationTick,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 
