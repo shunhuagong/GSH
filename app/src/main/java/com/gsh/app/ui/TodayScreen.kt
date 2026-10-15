@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -326,46 +327,49 @@ private fun MealSection(
     onDelete: (MealEntry) -> Unit,
     onEdit: (MealEntry) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize()
-    ) {
-        Row(
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onAdd),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .animateContentSize()
         ) {
-            Text(mealEmoji(mealType), fontSize = 16.sp)
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = MealEntry.mealName(mealType),
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                Icons.Filled.Add,
-                contentDescription = "添加${MealEntry.mealName(mealType)}",
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        if (entries.isEmpty()) {
-            Text(
-                text = "＋ 点击添加${MealEntry.mealName(mealType)}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 13.sp,
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onAdd)
-                    .padding(vertical = 4.dp)
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                entries.forEach { entry ->
-                    MealEntryRow(entry = entry, onEdit = { onEdit(entry) }, onDelete = onDelete)
+                    .clickable(onClick = onAdd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(mealEmoji(mealType), fontSize = 16.sp)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = MealEntry.mealName(mealType),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = "添加${MealEntry.mealName(mealType)}",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            if (entries.isEmpty()) {
+                Text(
+                    text = "＋ 点击添加${MealEntry.mealName(mealType)}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onAdd)
+                        .padding(vertical = 2.dp)
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    entries.forEach { entry ->
+                        MealEntryRow(entry = entry, onEdit = { onEdit(entry) }, onDelete = onDelete)
+                    }
                 }
             }
         }
@@ -383,7 +387,10 @@ private fun mealEmoji(type: Int): String = when (type) {
 private fun MealEntryRow(entry: MealEntry, onEdit: () -> Unit, onDelete: (MealEntry) -> Unit) {
     Card(
         onClick = onEdit,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
         Row(
             modifier = Modifier
