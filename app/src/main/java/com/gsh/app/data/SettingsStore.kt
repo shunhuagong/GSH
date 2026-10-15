@@ -63,6 +63,14 @@ class SettingsStore(context: Context) {
     private val _aiConfig = MutableStateFlow(readAiConfig())
     val aiConfig: StateFlow<AiConfig> = _aiConfig.asStateFlow()
 
+    private val _dynamicColor = MutableStateFlow(prefs.getBoolean(KEY_DYNAMIC_COLOR, true))
+    val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
+
+    fun updateDynamicColor(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_DYNAMIC_COLOR, enabled).apply()
+        _dynamicColor.value = enabled
+    }
+
     fun updateProfile(profile: UserProfile) {
         prefs.edit()
             .putFloat(KEY_WEIGHT, profile.weightKg.toFloat())
@@ -117,5 +125,6 @@ class SettingsStore(context: Context) {
         const val KEY_AI_BASE_URL = "ai_base_url"
         const val KEY_AI_API_KEY = "ai_api_key"
         const val KEY_AI_MODEL = "ai_model"
+        const val KEY_DYNAMIC_COLOR = "dynamic_color"
     }
 }

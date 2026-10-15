@@ -20,6 +20,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -29,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +58,7 @@ fun SettingsScreen(vm: GshViewModel) {
     var aiModel by remember(aiConfig) { mutableStateOf(aiConfig.model) }
     var exportError by remember { mutableStateOf<String?>(null) }
 
+    val dynamicColor by vm.dynamicColor.collectAsState()
     val context = LocalContext.current
 
     exportError?.let { message ->
@@ -92,6 +95,24 @@ fun SettingsScreen(vm: GshViewModel) {
         TopAppBar(title = { Text("设置") })
 
         Column(modifier = Modifier.padding(16.dp)) {
+            Text("外观", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("动态取色")
+                    Text(
+                        "跟随系统壁纸自动配色（Material You，Android 12+），关闭后使用默认绿色主题",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = dynamicColor, onCheckedChange = vm::setDynamicColor)
+            }
+
+            Spacer(Modifier.height(16.dp))
             Text("身体信息", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(

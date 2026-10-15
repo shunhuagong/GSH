@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.gsh.app.ui.GshApp
 import com.gsh.app.ui.GshTheme
 import com.gsh.app.ui.GshViewModel
@@ -17,7 +19,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            GshTheme {
+            val dynamicColor by vm.dynamicColor.collectAsState()
+            GshTheme(dynamicColor = dynamicColor) {
                 GshApp()
             }
         }

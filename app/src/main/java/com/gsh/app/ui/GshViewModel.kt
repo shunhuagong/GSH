@@ -86,6 +86,13 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
 
     val profile: StateFlow<UserProfile> = repo.settings.profile
 
+    /** 外观：动态取色（Material You） */
+    val dynamicColor: StateFlow<Boolean> = repo.settings.dynamicColor
+
+    fun setDynamicColor(enabled: Boolean) {
+        repo.settings.updateDynamicColor(enabled)
+    }
+
     /** date -> 是否训练日（未标记的日期默认训练日） */
     val dayTypes: StateFlow<Map<String, Boolean>> =
         repo.dayTypeDao.observeAll()
