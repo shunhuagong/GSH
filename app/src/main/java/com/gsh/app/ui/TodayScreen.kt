@@ -326,44 +326,44 @@ private fun MealSection(
     onDelete: (MealEntry) -> Unit,
     onEdit: (MealEntry) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-                .animateContentSize()
+                .clickable(onClick = onAdd),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
+            Text(mealEmoji(mealType), fontSize = 16.sp)
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = MealEntry.mealName(mealType),
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = "添加${MealEntry.mealName(mealType)}",
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        if (entries.isEmpty()) {
+            Text(
+                text = "＋ 点击添加${MealEntry.mealName(mealType)}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onAdd),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(mealEmoji(mealType), fontSize = 16.sp)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = MealEntry.mealName(mealType),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                Icon(
-                    Icons.Filled.Add,
-                    contentDescription = "添加${MealEntry.mealName(mealType)}",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-            if (entries.isEmpty()) {
-                Text(
-                    text = "＋ 点击添加${MealEntry.mealName(mealType)}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onAdd)
-                        .padding(top = 6.dp)
-                )
-            } else {
+                    .clickable(onClick = onAdd)
+                    .padding(vertical = 4.dp)
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 entries.forEach { entry ->
                     MealEntryRow(entry = entry, onEdit = { onEdit(entry) }, onDelete = onDelete)
                 }
@@ -381,29 +381,33 @@ private fun mealEmoji(type: Int): String = when (type) {
 
 @Composable
 private fun MealEntryRow(entry: MealEntry, onEdit: () -> Unit, onDelete: (MealEntry) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onEdit)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Card(
+        onClick = onEdit,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = entry.foodName, fontWeight = FontWeight.Bold)
-            Text(
-                text = "%.0f %s · 蛋白 %.1f · 碳水 %.1f · 脂肪 %.1f · %.0f kcal"
-                    .format(entry.amount, entry.amountLabel, entry.protein, entry.carbs, entry.fat, entry.calories),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        IconButton(onClick = { onDelete(entry) }) {
-            Icon(
-                Icons.Outlined.Delete,
-                contentDescription = "删除",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = entry.foodName, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "%.0f %s · 蛋白 %.1f · 碳水 %.1f · 脂肪 %.1f · %.0f kcal"
+                        .format(entry.amount, entry.amountLabel, entry.protein, entry.carbs, entry.fat, entry.calories),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = { onDelete(entry) }) {
+                Icon(
+                    Icons.Outlined.Delete,
+                    contentDescription = "删除",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
