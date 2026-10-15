@@ -32,8 +32,9 @@ class GshRepository(context: Context) {
     /**
      * 按名字同步预置食物库：
      * 1. 补插种子清单中缺失的条目（如新增食物、肉类拆分生熟后的新条目）；
-     * 2. 清理已不在种子清单中的旧预置条目（如被生熟拆分替代的旧口径"鸡胸肉"）。
-     * 不影响自定义食物；历史记录保存营养快照，不受条目变动影响。
+     * 2. 清理已不在种子清单中的旧预置条目（如被生熟拆分替代的旧口径"鸡胸肉"）；
+     * 3. 种子数值修订：同名预置条目若与种子值不一致则更新（不动自定义食物）。
+     * 不影响历史记录；历史记录保存营养快照，不受条目变动影响。
      */
     suspend fun seedFoods() {
         val seedNames = SeedFoods.list.map { it.name }.toHashSet()
@@ -47,6 +48,18 @@ class GshRepository(context: Context) {
         val stale = (existing - seedNames).toList()
         if (stale.isNotEmpty()) {
             foodDao.deleteNonCustom(stale)
+        }
+
+        SeedFoods.list.forEach { seed ->
+            val current = foodDao.byName(seed.name) ?: return@forEach
+            if (!current.isCustom &&
+                (current.proteinPerUnit != seed.proteinPerUnit ||
+                    current.carbsPerUnit != seed.carbsPerUnit ||
+                    current.fatPerUnit != seed.fatPerUnit ||
+                    current.unit != seed.unit)
+            ) {
+                foodDao.update(seed.copy(id = current.id))
+            }
         }
     }
 

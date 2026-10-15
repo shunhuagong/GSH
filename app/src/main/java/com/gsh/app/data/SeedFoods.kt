@@ -38,7 +38,8 @@ object SeedFoods {
         Food(name = "馒头", proteinPerUnit = 7.0, carbsPerUnit = 47.0, fatPerUnit = 1.1),
         Food(name = "面条（熟）", proteinPerUnit = 4.5, carbsPerUnit = 25.0, fatPerUnit = 0.5),
         Food(name = "全麦面包", proteinPerUnit = 9.0, carbsPerUnit = 45.0, fatPerUnit = 3.4),
-        Food(name = "燕麦片", proteinPerUnit = 15.0, carbsPerUnit = 61.0, fatPerUnit = 7.0),
+        // 燕麦按记账口径只作碳水来源，蛋白计 0（不占优质蛋白份额）
+        Food(name = "燕麦片", proteinPerUnit = 0.0, carbsPerUnit = 61.0, fatPerUnit = 7.0),
         Food(name = "红薯", proteinPerUnit = 1.1, carbsPerUnit = 23.0, fatPerUnit = 0.1),
         Food(name = "土豆", proteinPerUnit = 2.0, carbsPerUnit = 17.0, fatPerUnit = 0.2),
         Food(name = "玉米", proteinPerUnit = 4.0, carbsPerUnit = 22.8, fatPerUnit = 1.2),
