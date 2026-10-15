@@ -286,10 +286,10 @@ private fun NutritionSummaryCard(entries: List<MealEntry>, targets: NutritionTar
                     text = "%.0f".format(calories),
                     fontSize = 34.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = if (calories > targets.calories) {
+                    color = if (calories >= targets.calories) {
                         MaterialTheme.colorScheme.error
                     } else {
-                        MaterialTheme.colorScheme.primary
+                        CarbsColor
                     }
                 )
                 Spacer(Modifier.width(4.dp))
