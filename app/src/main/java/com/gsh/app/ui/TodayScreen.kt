@@ -269,13 +269,35 @@ private fun NutritionSummaryCard(entries: List<MealEntry>, targets: NutritionTar
                 MacroRing("脂肪", fat, targets.fat, FatColor)
             }
             Spacer(Modifier.height(12.dp))
-            Text(
-                text = "热量  %.0f / %.0f kcal".format(calories, targets.calories),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "热量",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = "%.0f".format(calories),
+                        fontSize = 34.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (calories > targets.calories) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "/ %.0f kcal".format(targets.calories),
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 5.dp)
+                    )
+                }
+            }
         }
     }
 }
