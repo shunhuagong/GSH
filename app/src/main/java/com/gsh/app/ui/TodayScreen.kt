@@ -269,34 +269,36 @@ private fun NutritionSummaryCard(entries: List<MealEntry>, targets: NutritionTar
                 MacroRing("脂肪", fat, targets.fat, FatColor)
             }
             Spacer(Modifier.height(12.dp))
-            Column(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.Bottom
             ) {
                 Text(
                     text = "热量",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 5.dp)
                 )
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = "%.0f".format(calories),
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (calories > targets.calories) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        }
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = "/ %.0f kcal".format(targets.calories),
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 5.dp)
-                    )
-                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "%.0f".format(calories),
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (calories > targets.calories) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "/ %.0f kcal".format(targets.calories),
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 5.dp)
+                )
             }
         }
     }
