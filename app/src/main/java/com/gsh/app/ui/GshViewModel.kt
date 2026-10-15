@@ -1,0 +1,293 @@
+package com.gsh.app.ui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.gsh.app.ai.AiAdvisor
+import com.gsh.app.ai.AiException
+import com.gsh.app.ai.AiUiState
+import com.gsh.app.data.AiConfig
+import com.gsh.app.data.DailyTotal
+import com.gsh.app.data.DateUtils
+import com.gsh.app.data.Food
+import com.gsh.app.data.GshRepository
+import com.gsh.app.data.MealEntry
+import com.gsh.app.data.NutritionTargets
+import com.gsh.app.data.UserProfile
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.io.File
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class GshViewModel(private val repo: GshRepository) : ViewModel() {
+
+    init {
+        viewModelScope.launch { repo.seedFoods() }
+    }
+
+    // ---------- 今日/所选日期 ----------
+
+    private val _selectedDate = MutableStateFlow(DateUtils.today())
+    val selectedDate: StateFlow<String> = _selectedDate.asStateFlow()
+
+    /** 上次活跃日期：应用跨天回到前台时自动定位到新的一天。 */
+    private var lastActiveDate: String = DateUtils.today()
+
+    fun refreshIfNewDay() {
+        val today = DateUtils.today()
+        if (today != lastActiveDate) {
+            lastActiveDate = today
+            _selectedDate.value = today
+        }
+    }
+
+    val entriesForDate: StateFlow<List<MealEntry>> =
+        _selectedDate
+            .flatMapLatest { date -> repo.mealEntryDao.observeByDate(date) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ---------- 历史 ----------
+
+    val dailyTotals: StateFlow<List<DailyTotal>> =
+        repo.dailyTotalDao.observeDailyTotals()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ---------- 目标 ----------
+
+    val profile: StateFlow<UserProfile> = repo.settings.profile
+
+    /** date -> 是否训练日（未标记的日期默认训练日） */
+    val dayTypes: StateFlow<Map<String, Boolean>> =
+        repo.dayTypeDao.observeAll()
+            .map { list -> list.associate { it.date to it.isTraining } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** 当前所选日期是否为训练日 */
+    val isTrainingDay: StateFlow<Boolean> =
+        combine(_selectedDate, dayTypes) { date, types -> types[date] ?: true }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    /** 当前所选日期的营养目标（随日类型切换） */
+    val targets: StateFlow<NutritionTargets> =
+        combine(profile, isTrainingDay) { p, isTraining ->
+            NutritionTargets.from(p, isTraining)
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            NutritionTargets.from(profile.value, true)
+        )
+
+    fun setDayType(date: String, isTraining: Boolean) {
+        viewModelScope.launch { repo.setDayType(date, isTraining) }
+    }
+
+    // ---------- 食物搜索 ----------
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    val foods: StateFlow<List<Food>> =
+        _searchQuery
+            .flatMapLatest { q ->
+                if (q.isBlank()) repo.foodDao.observeAll() else repo.foodDao.search(q.trim())
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ---------- 搜索历史 ----------
+
+    private val _searchHistory = MutableStateFlow(repo.searchHistory.get())
+    val searchHistory: StateFlow<List<String>> = _searchHistory.asStateFlow()
+
+    fun recordSearch(term: String) {
+        if (term.isBlank()) return
+        repo.searchHistory.add(term)
+        _searchHistory.value = repo.searchHistory.get()
+    }
+
+    fun clearSearchHistory() {
+        repo.searchHistory.clear()
+        _searchHistory.value = emptyList()
+    }
+
+    // ---------- AI 分析 ----------
+
+    private val advisor = AiAdvisor()
+
+    val aiConfig: StateFlow<AiConfig> = repo.settings.aiConfig
+
+    private val _dailyAnalysis = MutableStateFlow<AiUiState>(AiUiState.Idle)
+    val dailyAnalysis: StateFlow<AiUiState> = _dailyAnalysis.asStateFlow()
+
+    private val _weeklyReport = MutableStateFlow<AiUiState>(AiUiState.Idle)
+    val weeklyReport: StateFlow<AiUiState> = _weeklyReport.asStateFlow()
+
+    fun updateAiConfig(config: AiConfig) {
+        repo.settings.updateAiConfig(config)
+    }
+
+    /** 分析当前所选日期的饮食。 */
+    fun requestDailyAnalysis() {
+        if (_dailyAnalysis.value is AiUiState.Loading) return
+        val entries = entriesForDate.value
+        if (entries.isEmpty()) {
+            _dailyAnalysis.value = AiUiState.Error("这一天还没有饮食记录，先记点什么吧")
+            return
+        }
+        _dailyAnalysis.value = AiUiState.Loading
+        viewModelScope.launch {
+            _dailyAnalysis.value = try {
+                AiUiState.Success(
+                    advisor.analyzeDaily(
+                        config = aiConfig.value,
+                        date = _selectedDate.value,
+                        entries = entries,
+                        targets = targets.value,
+                        isTraining = isTrainingDay.value,
+                        profile = profile.value
+                    )
+                )
+            } catch (e: AiException) {
+                AiUiState.Error(e.message ?: "分析失败，请稍后重试")
+            }
+        }
+    }
+
+    fun dismissDailyAnalysis() {
+        _dailyAnalysis.value = AiUiState.Idle
+    }
+
+    /** 近7天周报：无记录的天也会展示给 AI，便于指出断记习惯。 */
+    fun requestWeeklyReport() {
+        if (_weeklyReport.value is AiUiState.Loading) return
+        val today = DateUtils.today()
+        val startDate = DateUtils.format(DateUtils.parse(today).minusDays(6))
+        val recent = dailyTotals.value.filter { it.date >= startDate }
+        if (recent.isEmpty()) {
+            _weeklyReport.value = AiUiState.Error("近7天还没有饮食记录，无法生成周报")
+            return
+        }
+        _weeklyReport.value = AiUiState.Loading
+        viewModelScope.launch {
+            _weeklyReport.value = try {
+                AiUiState.Success(
+                    advisor.analyzeWeekly(
+                        config = aiConfig.value,
+                        totals = recent,
+                        dayTypes = dayTypes.value,
+                        profile = profile.value,
+                        today = today
+                    )
+                )
+            } catch (e: AiException) {
+                AiUiState.Error(e.message ?: "分析失败，请稍后重试")
+            }
+        }
+    }
+
+    fun dismissWeeklyReport() {
+        _weeklyReport.value = AiUiState.Idle
+    }
+
+    // ---------- 操作 ----------
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun selectDate(date: String) {
+        _selectedDate.value = date
+    }
+
+    fun addEntry(food: Food, amount: Double, mealType: Int) {
+        viewModelScope.launch {
+            repo.addEntry(food, amount, mealType, _selectedDate.value)
+        }
+    }
+
+    fun deleteEntry(entry: MealEntry) {
+        viewModelScope.launch { repo.mealEntryDao.delete(entry) }
+    }
+
+    fun updateEntryAmount(entry: MealEntry, amount: Double) {
+        viewModelScope.launch { repo.updateEntryAmount(entry, amount) }
+    }
+
+    /** 复制饮食：预览日期对应的记录内容。 */
+    private val _copyPreviewDate = MutableStateFlow<String?>(null)
+
+    val copyPreviewEntries: StateFlow<List<MealEntry>> =
+        _copyPreviewDate
+            .flatMapLatest { date ->
+                if (date == null) flowOf(emptyList()) else repo.mealEntryDao.observeByDate(date)
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun setCopyPreviewDate(date: String?) {
+        _copyPreviewDate.value = date
+    }
+
+    /** 把指定日期的全部记录复制到今天，回调返回复制条数。 */
+    fun copyToToday(from: String, onDone: (Int) -> Unit) {
+        viewModelScope.launch { onDone(repo.copyDay(from, DateUtils.today())) }
+    }
+
+    /** 导出 CSV，文件生成成功回调非空值，失败为 null。 */
+    fun exportCsv(onDone: (File?) -> Unit) {
+        viewModelScope.launch { onDone(runCatching { repo.exportCsv() }.getOrNull()) }
+    }
+
+    /** 导出 JSON，文件生成成功回调非空值，失败为 null。 */
+    fun exportJson(onDone: (File?) -> Unit) {
+        viewModelScope.launch { onDone(runCatching { repo.exportJson() }.getOrNull()) }
+    }
+
+    fun addCustomFood(
+        name: String,
+        proteinPerUnit: Double,
+        carbsPerUnit: Double,
+        fatPerUnit: Double,
+        unit: Int
+    ) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            repo.foodDao.insert(
+                Food(
+                    name = name.trim(),
+                    proteinPerUnit = proteinPerUnit,
+                    carbsPerUnit = carbsPerUnit,
+                    fatPerUnit = fatPerUnit,
+                    unit = unit,
+                    isCustom = true
+                )
+            )
+        }
+    }
+
+    fun deleteCustomFood(food: Food) {
+        viewModelScope.launch { repo.foodDao.deleteCustom(food.id) }
+    }
+
+    fun updateProfile(profile: UserProfile) {
+        repo.settings.updateProfile(profile)
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
+                GshViewModel(GshRepository.get(app))
+            }
+        }
+    }
+}
