@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -331,7 +330,7 @@ private fun MealSection(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
                 .animateContentSize()
         ) {
             Row(
@@ -354,7 +353,6 @@ private fun MealSection(
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
-            Spacer(Modifier.height(8.dp))
             if (entries.isEmpty()) {
                 Text(
                     text = "＋ 点击添加${MealEntry.mealName(mealType)}",
@@ -363,13 +361,11 @@ private fun MealSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable(onClick = onAdd)
-                        .padding(vertical = 2.dp)
+                        .padding(top = 6.dp)
                 )
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    entries.forEach { entry ->
-                        MealEntryRow(entry = entry, onEdit = { onEdit(entry) }, onDelete = onDelete)
-                    }
+                entries.forEach { entry ->
+                    MealEntryRow(entry = entry, onEdit = { onEdit(entry) }, onDelete = onDelete)
                 }
             }
         }
@@ -385,36 +381,29 @@ private fun mealEmoji(type: Int): String = when (type) {
 
 @Composable
 private fun MealEntryRow(entry: MealEntry, onEdit: () -> Unit, onDelete: (MealEntry) -> Unit) {
-    Card(
-        onClick = onEdit,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onEdit)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = entry.foodName, fontWeight = FontWeight.Bold)
-                Text(
-                    text = "%.0f %s · 蛋白 %.1f · 碳水 %.1f · 脂肪 %.1f · %.0f kcal"
-                        .format(entry.amount, entry.amountLabel, entry.protein, entry.carbs, entry.fat, entry.calories),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            IconButton(onClick = { onDelete(entry) }) {
-                Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = "删除",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = entry.foodName, fontWeight = FontWeight.Bold)
+            Text(
+                text = "%.0f %s · 蛋白 %.1f · 碳水 %.1f · 脂肪 %.1f · %.0f kcal"
+                    .format(entry.amount, entry.amountLabel, entry.protein, entry.carbs, entry.fat, entry.calories),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        IconButton(onClick = { onDelete(entry) }) {
+            Icon(
+                Icons.Outlined.Delete,
+                contentDescription = "删除",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
