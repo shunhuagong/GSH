@@ -31,33 +31,32 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gsh.app.data.DateUtils
+import com.gsh.app.data.Photo
 
 /** 「变化」页：按时间线记录体型照片，前后对比身材变化。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BodyScreen(vm: GshViewModel) {
     val photos by vm.bodyPhotos.collectAsState()
-    var viewingPhotoId by remember { mutableStateOf<Long?>(null) }
+    var viewingPhoto by remember { mutableStateOf<Photo?>(null) }
 
     val launchers = rememberPhotoLaunchers { uri, tempFile ->
         if (uri != null) vm.addBodyPhoto(uri, tempFile)
     }
 
-    // 连续删除：删一张自动跳到同一天下一张，删光自动关闭
-    val viewingPhoto = photos.firstOrNull { it.id == viewingPhotoId }
-    if (viewingPhoto != null) {
-        val group = photos.filter { it.date == viewingPhoto.date }
-        PhotoViewerDialog(
-            photos = group,
-            photoId = viewingPhoto.id,
-            fileOf = vm::photoFile,
-            captionOf = { DateUtils.display(it.date) },
-            onDelete = { photo ->
-                vm.deletePhoto(photo)
-                viewingPhotoId = nextAfterDelete(group, photo)?.id
-            },
-            onDismiss = { viewingPhotoId = null }
-        )
+    // 查看器：同一天照片左右滑动切换；删除后自动停在下一张，删光自动关闭
+    viewingPhoto?.let { entry ->
+        val group = photos.filter { it.date == entry.date }
+        if (group.isNotEmpty()) {
+            PhotoViewerDialog(
+                photos = group,
+                initialId = entry.id,
+                fileOf = vm::photoFile,
+                captionOf = { DateUtils.display(it.date) },
+                onDelete = { photo -> vm.deletePhoto(photo) },
+                onDismiss = { viewingPhoto = null }
+            )
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -115,7 +114,7 @@ fun BodyScreen(vm: GshViewModel) {
                                         PhotoThumb(
                                             file = vm.photoFile(photo),
                                             size = 110.dp,
-                                            onClick = { viewingPhotoId = photo.id }
+                                            onClick = { viewingPhoto = photo }
                                         )
                                     }
                                 }

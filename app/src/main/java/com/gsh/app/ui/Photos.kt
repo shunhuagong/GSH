@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -105,22 +108,31 @@ fun PhotoThumb(
 }
 
 /**
- * 全屏看大图：黑色底，点任意处关闭，右上角删除，左下角显示日期与第几张。
- * photos 为同组照片（同餐次/同日期），删除一张后由调用方跳到下一张，
- * 支持连续删除；组内删光时由调用方关闭对话框。
+ * 全屏看大图：黑色底，左右滑动切换同组照片（同餐次/同日期），
+ * 点任意处关闭，右上角删除（删一张后自动停在下一张，组内删光由调用方关闭），
+ * 左下角显示日期与第几张。
  */
 @Composable
 fun PhotoViewerDialog(
     photos: List<Photo>,
-    photoId: Long,
+    initialId: Long,
     fileOf: (Photo) -> File,
     captionOf: (Photo) -> String,
     onDelete: (Photo) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val index = photos.indexOfFirst { it.id == photoId }
-    if (index < 0) return
-    val current = photos[index]
+    if (photos.isEmpty()) return
+    val pagerState = rememberPagerState(
+        initialPage = photos.indexOfFirst { it.id == initialId }.coerceAtLeast(0),
+        pageCount = { photos.size }
+    )
+
+    // 删除最后一张后当前页码越界，收回新的末页
+    LaunchedEffect(photos.size) {
+        if (photos.isNotEmpty() && pagerState.currentPage > photos.lastIndex) {
+            pagerState.animateScrollToPage(photos.lastIndex)
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -130,24 +142,31 @@ fun PhotoViewerDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                .clickable { onDismiss() }
         ) {
-            AsyncImage(
-                model = fileOf(current),
-                contentDescription = "照片大图",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
-            )
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { onDismiss() }
+            ) { page ->
+                AsyncImage(
+                    model = fileOf(photos[page]),
+                    contentDescription = "照片大图",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
             TextButton(
-                onClick = { onDelete(current) },
+                onClick = { photos.getOrNull(pagerState.currentPage)?.let(onDelete) },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 24.dp, end = 8.dp)
             ) {
                 Text("删除", color = Color.White, fontWeight = FontWeight.Bold)
             }
+            val page = pagerState.currentPage.coerceIn(0, photos.lastIndex)
             Text(
-                text = captionOf(current) + " · ${index + 1}/${photos.size}",
+                text = captionOf(photos[page]) + " · ${page + 1}/${photos.size}",
                 color = Color.White.copy(alpha = 0.85f),
                 fontSize = 13.sp,
                 modifier = Modifier
@@ -156,10 +175,4 @@ fun PhotoViewerDialog(
             )
         }
     }
-}
-
-/** 删除 current 后同组里接着要显示的照片：优先下一张，其次上一张；删光返回 null。 */
-fun nextAfterDelete(photos: List<Photo>, current: Photo): Photo? {
-    val index = photos.indexOfFirst { it.id == current.id }
-    return photos.getOrNull(index + 1) ?: photos.getOrNull(index - 1)
 }
