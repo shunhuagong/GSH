@@ -32,6 +32,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
+import com.gsh.app.data.Photo
 import java.io.File
 
 /**
@@ -104,15 +105,23 @@ fun PhotoThumb(
 }
 
 /**
- * 全屏看大图：黑色底，点任意处关闭，右上角删除，左下角显示日期等信息。
+ * 全屏看大图：黑色底，点任意处关闭，右上角删除，左下角显示日期与第几张。
+ * photos 为同组照片（同餐次/同日期），删除一张后由调用方跳到下一张，
+ * 支持连续删除；组内删光时由调用方关闭对话框。
  */
 @Composable
 fun PhotoViewerDialog(
-    file: File,
-    caption: String,
-    onDelete: () -> Unit,
+    photos: List<Photo>,
+    photoId: Long,
+    fileOf: (Photo) -> File,
+    captionOf: (Photo) -> String,
+    onDelete: (Photo) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val index = photos.indexOfFirst { it.id == photoId }
+    if (index < 0) return
+    val current = photos[index]
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -124,13 +133,13 @@ fun PhotoViewerDialog(
                 .clickable { onDismiss() }
         ) {
             AsyncImage(
-                model = file,
+                model = fileOf(current),
                 contentDescription = "照片大图",
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
             TextButton(
-                onClick = onDelete,
+                onClick = { onDelete(current) },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 24.dp, end = 8.dp)
@@ -138,7 +147,7 @@ fun PhotoViewerDialog(
                 Text("删除", color = Color.White, fontWeight = FontWeight.Bold)
             }
             Text(
-                text = caption,
+                text = captionOf(current) + " · ${index + 1}/${photos.size}",
                 color = Color.White.copy(alpha = 0.85f),
                 fontSize = 13.sp,
                 modifier = Modifier
@@ -147,4 +156,10 @@ fun PhotoViewerDialog(
             )
         }
     }
+}
+
+/** 删除 current 后同组里接着要显示的照片：优先下一张，其次上一张；删光返回 null。 */
+fun nextAfterDelete(photos: List<Photo>, current: Photo): Photo? {
+    val index = photos.indexOfFirst { it.id == current.id }
+    return photos.getOrNull(index + 1) ?: photos.getOrNull(index - 1)
 }

@@ -31,28 +31,32 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gsh.app.data.DateUtils
-import com.gsh.app.data.Photo
 
 /** 「变化」页：按时间线记录体型照片，前后对比身材变化。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BodyScreen(vm: GshViewModel) {
     val photos by vm.bodyPhotos.collectAsState()
-    var viewing by remember { mutableStateOf<Photo?>(null) }
+    var viewingPhotoId by remember { mutableStateOf<Long?>(null) }
 
     val launchers = rememberPhotoLaunchers { uri, tempFile ->
         if (uri != null) vm.addBodyPhoto(uri, tempFile)
     }
 
-    viewing?.let { photo ->
+    // 连续删除：删一张自动跳到同一天下一张，删光自动关闭
+    val viewingPhoto = photos.firstOrNull { it.id == viewingPhotoId }
+    if (viewingPhoto != null) {
+        val group = photos.filter { it.date == viewingPhoto.date }
         PhotoViewerDialog(
-            file = vm.photoFile(photo),
-            caption = DateUtils.display(photo.date),
-            onDelete = {
+            photos = group,
+            photoId = viewingPhoto.id,
+            fileOf = vm::photoFile,
+            captionOf = { DateUtils.display(it.date) },
+            onDelete = { photo ->
                 vm.deletePhoto(photo)
-                viewing = null
+                viewingPhotoId = nextAfterDelete(group, photo)?.id
             },
-            onDismiss = { viewing = null }
+            onDismiss = { viewingPhotoId = null }
         )
     }
 
@@ -111,7 +115,7 @@ fun BodyScreen(vm: GshViewModel) {
                                         PhotoThumb(
                                             file = vm.photoFile(photo),
                                             size = 110.dp,
-                                            onClick = { viewing = photo }
+                                            onClick = { viewingPhotoId = photo.id }
                                         )
                                     }
                                 }

@@ -81,7 +81,7 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
     var celebrationTick by remember { mutableStateOf(0) }
     var celebrated by remember { mutableStateOf(false) }
     var pendingPhotoMeal by remember { mutableStateOf<Int?>(null) }
-    var viewingPhoto by remember { mutableStateOf<Photo?>(null) }
+    var viewingPhotoId by remember { mutableStateOf<Long?>(null) }
 
     // 拍照/选图回调：从上下文取出待打卡的餐次，交给仓库导入
     val photoLaunchers = rememberPhotoLaunchers { uri, tempFile ->
@@ -143,15 +143,20 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
         )
     }
 
-    viewingPhoto?.let { photo ->
+    // 连续删除：删一张自动跳到同餐次下一张，删光自动关闭
+    val viewingPhoto = mealPhotos.firstOrNull { it.id == viewingPhotoId }
+    if (viewingPhoto != null) {
+        val group = mealPhotos.filter { it.mealType == viewingPhoto.mealType }
         PhotoViewerDialog(
-            file = vm.photoFile(photo),
-            caption = "${DateUtils.display(photo.date)} · ${MealEntry.mealName(photo.mealType)}",
-            onDelete = {
+            photos = group,
+            photoId = viewingPhoto.id,
+            fileOf = vm::photoFile,
+            captionOf = { "${DateUtils.display(it.date)} · ${MealEntry.mealName(it.mealType)}" },
+            onDelete = { photo ->
                 vm.deletePhoto(photo)
-                viewingPhoto = null
+                viewingPhotoId = nextAfterDelete(group, photo)?.id
             },
-            onDismiss = { viewingPhoto = null }
+            onDismiss = { viewingPhotoId = null }
         )
     }
 
@@ -206,7 +211,7 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
                     photos = mealPhotos.filter { it.mealType == mealType },
                     onAdd = { onAddClick(mealType) },
                     onPhoto = { pendingPhotoMeal = mealType },
-                    onViewPhoto = { viewingPhoto = it },
+                    onViewPhoto = { viewingPhotoId = it.id },
                     photoFile = vm::photoFile,
                     onDelete = vm::deleteEntry,
                     onEdit = { editingEntry = it }
