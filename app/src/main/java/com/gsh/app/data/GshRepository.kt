@@ -1,11 +1,17 @@
 package com.gsh.app.data
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.time.LocalDateTime
 import java.util.Locale
 
@@ -14,11 +20,13 @@ import java.util.Locale
  */
 class GshRepository(context: Context) {
 
+    private val appContext = context.applicationContext
     private val db = AppDatabase.get(context)
     val foodDao: FoodDao = db.foodDao()
     val mealEntryDao: MealEntryDao = db.mealEntryDao()
     val dailyTotalDao: DailyTotalDao = db.dailyTotalDao()
     val dayTypeDao: DayTypeDao = db.dayTypeDao()
+    val photoDao: PhotoDao = db.photoDao()
     val settings: SettingsStore = SettingsStore(context)
     val searchHistory: SearchHistoryStore = SearchHistoryStore(context)
 
@@ -102,6 +110,96 @@ class GshRepository(context: Context) {
         return source.size
     }
 
+    // ---------- 照片 ----------
+
+    /**
+     * 导入一张打卡照片：先按尺寸采样解码（避免大图整个读进内存），
+     * 再按 EXIF 旋转矫正、最长边压到 MAX_PHOTO_DIMENSION，存为 JPEG 入库。
+     * 返回是否成功；失败时清理半成品文件。
+     */
+    suspend fun savePhoto(source: Uri, kind: Int, date: String, mealType: Int): Boolean =
+        withContext(Dispatchers.IO) {
+            val resolver = appContext.contentResolver
+
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            resolver.openInputStream(source)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext false
+
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= MAX_PHOTO_DIMENSION ||
+                bounds.outHeight / (sample * 2) >= MAX_PHOTO_DIMENSION
+            ) {
+                sample *= 2
+            }
+            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+            var bitmap = resolver.openInputStream(source)?.use {
+                BitmapFactory.decodeStream(it, null, opts)
+            } ?: return@withContext false
+
+            // 相机照片的竖拍方向记录在 EXIF 里，解码不会自动应用，需手动转正
+            val rotation = runCatching {
+                resolver.openInputStream(source)?.use { ExifInterface(it).rotationDegrees } ?: 0
+            }.getOrDefault(0)
+            if (rotation != 0) {
+                val rotated = Bitmap.createBitmap(
+                    bitmap, 0, 0, bitmap.width, bitmap.height,
+                    Matrix().apply { postRotate(rotation.toFloat()) }, true
+                )
+                if (rotated !== bitmap) {
+                    bitmap.recycle()
+                    bitmap = rotated
+                }
+            }
+
+            // 采样只能成倍减，超出边长时再精确缩一次
+            val maxSide = maxOf(bitmap.width, bitmap.height)
+            if (maxSide > MAX_PHOTO_DIMENSION) {
+                val scale = MAX_PHOTO_DIMENSION.toFloat() / maxSide
+                val scaled = Bitmap.createScaledBitmap(
+                    bitmap,
+                    (bitmap.width * scale).toInt().coerceAtLeast(1),
+                    (bitmap.height * scale).toInt().coerceAtLeast(1),
+                    true
+                )
+                if (scaled !== bitmap) {
+                    bitmap.recycle()
+                    bitmap = scaled
+                }
+            }
+
+            val relative = "photos/" + if (kind == Photo.KIND_BODY) "body" else "meal"
+            val dir = File(appContext.filesDir, relative).apply { mkdirs() }
+            val file = File(dir, "${System.currentTimeMillis()}.jpg")
+            FileOutputStream(file).use { out ->
+                if (!bitmap.compress(Bitmap.CompressFormat.JPEG, PHOTO_JPEG_QUALITY, out)) {
+                    bitmap.recycle()
+                    file.delete()
+                    return@withContext false
+                }
+            }
+            bitmap.recycle()
+
+            photoDao.insert(
+                Photo(
+                    kind = kind,
+                    date = date,
+                    mealType = mealType,
+                    path = "$relative/${file.name}",
+                    createdAt = System.currentTimeMillis()
+                )
+            )
+            true
+        }
+
+    /** 删除照片：先删记录再删文件。 */
+    suspend fun deletePhoto(photo: Photo) {
+        photoDao.delete(photo.id)
+        withContext(Dispatchers.IO) { File(appContext.filesDir, photo.path).delete() }
+    }
+
+    /** 照片对应的私有文件（展示用）。 */
+    fun photoFile(photo: Photo): File = File(appContext.filesDir, photo.path)
+
     /** 导出全部饮食记录为 CSV（带 BOM，Excel 可直接打开）。 */
     suspend fun exportCsv(): File = withContext(Dispatchers.IO) {
         val sb = StringBuilder("\uFEFF")
@@ -176,6 +274,12 @@ class GshRepository(context: Context) {
     private fun fixed(value: Double): String = String.format(Locale.US, "%.1f", value)
 
     companion object {
+        /** 照片最长边像素，超出等比压小以控制存储体积 */
+        private const val MAX_PHOTO_DIMENSION = 1600
+
+        /** 照片 JPEG 压缩质量 */
+        private const val PHOTO_JPEG_QUALITY = 85
+
         @Volatile
         private var instance: GshRepository? = null
 

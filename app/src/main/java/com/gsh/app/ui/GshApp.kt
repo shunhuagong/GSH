@@ -7,6 +7,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccessibilityNew
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Settings
@@ -34,6 +35,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 private val tabs = listOf(
     Tab("today", "今日", Icons.Outlined.Today),
     Tab("history", "历史", Icons.Outlined.History),
+    Tab("body", "变化", Icons.Outlined.AccessibilityNew),
     Tab("foods", "食物库", Icons.Outlined.Restaurant),
     Tab("settings", "设置", Icons.Outlined.Settings)
 )
@@ -115,6 +117,9 @@ fun GshApp(vm: GshViewModel = viewModel(factory = GshViewModel.Factory)) {
                         navigateToTab("today")
                     }
                 )
+            }
+            composable("body") {
+                BodyScreen(vm = vm)
             }
             composable("foods") {
                 FoodLibraryScreen(vm = vm)

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,6 +62,8 @@ import com.gsh.app.data.DateUtils
 import com.gsh.app.data.Food
 import com.gsh.app.data.MealEntry
 import com.gsh.app.data.NutritionTargets
+import com.gsh.app.data.Photo
+import java.io.File
 
 /** onAddClick 参数为餐别（0~3），-1 表示由添加页按时间自动选择。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,10 +75,22 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
     val isTrainingDay by vm.isTrainingDay.collectAsState()
     val dailyAnalysis by vm.dailyAnalysis.collectAsState()
     val streak by vm.streak.collectAsState()
+    val mealPhotos by vm.mealPhotos.collectAsState()
 
     var editingEntry by remember { mutableStateOf<MealEntry?>(null) }
     var celebrationTick by remember { mutableStateOf(0) }
     var celebrated by remember { mutableStateOf(false) }
+    var pendingPhotoMeal by remember { mutableStateOf<Int?>(null) }
+    var viewingPhoto by remember { mutableStateOf<Photo?>(null) }
+
+    // 拍照/选图回调：从上下文取出待打卡的餐次，交给仓库导入
+    val photoLaunchers = rememberPhotoLaunchers { uri, tempFile ->
+        val meal = pendingPhotoMeal
+        pendingPhotoMeal = null
+        if (uri != null && meal != null) {
+            vm.addMealPhoto(uri, meal, tempFile)
+        }
+    }
 
     // 三大营养素全部达标时，触发一次庆祝彩带（删掉记录后重置，可再次触发）
     val allMet = entries.isNotEmpty() &&
@@ -106,6 +122,36 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
                 vm.updateEntryAmount(entry, amount)
                 editingEntry = null
             }
+        )
+    }
+
+    pendingPhotoMeal?.let { meal ->
+        AlertDialog(
+            onDismissRequest = { pendingPhotoMeal = null },
+            title = { Text("添加${MealEntry.mealName(meal)}照片") },
+            text = { Text("拍照或从相册选一张，打卡这一餐") },
+            confirmButton = {
+                TextButton(onClick = { photoLaunchers.takePhoto() }) {
+                    Text("📷 拍照")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { photoLaunchers.pickFromGallery() }) {
+                    Text("🖼 从相册选")
+                }
+            }
+        )
+    }
+
+    viewingPhoto?.let { photo ->
+        PhotoViewerDialog(
+            file = vm.photoFile(photo),
+            caption = "${DateUtils.display(photo.date)} · ${MealEntry.mealName(photo.mealType)}",
+            onDelete = {
+                vm.deletePhoto(photo)
+                viewingPhoto = null
+            },
+            onDismiss = { viewingPhoto = null }
         )
     }
 
@@ -157,7 +203,11 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
                 MealSection(
                     mealType = mealType,
                     entries = mealEntries,
+                    photos = mealPhotos.filter { it.mealType == mealType },
                     onAdd = { onAddClick(mealType) },
+                    onPhoto = { pendingPhotoMeal = mealType },
+                    onViewPhoto = { viewingPhoto = it },
+                    photoFile = vm::photoFile,
                     onDelete = vm::deleteEntry,
                     onEdit = { editingEntry = it }
                 )
@@ -346,7 +396,11 @@ private fun MacroRing(
 private fun MealSection(
     mealType: Int,
     entries: List<MealEntry>,
+    photos: List<Photo>,
     onAdd: () -> Unit,
+    onPhoto: () -> Unit,
+    onViewPhoto: (Photo) -> Unit,
+    photoFile: (Photo) -> File,
     onDelete: (MealEntry) -> Unit,
     onEdit: (MealEntry) -> Unit
 ) {
@@ -372,10 +426,34 @@ private fun MealSection(
                     modifier = Modifier.weight(1f)
                 )
                 Icon(
+                    Icons.Outlined.PhotoCamera,
+                    contentDescription = "拍摄${MealEntry.mealName(mealType)}照片",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clickable { onPhoto() }
+                        .padding(6.dp)
+                        .size(20.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
                     Icons.Filled.Add,
                     contentDescription = "添加${MealEntry.mealName(mealType)}",
                     tint = MaterialTheme.colorScheme.primary
                 )
+            }
+            if (photos.isNotEmpty()) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    items(photos, key = { it.id }) { photo ->
+                        PhotoThumb(
+                            file = photoFile(photo),
+                            size = 56.dp,
+                            onClick = { onViewPhoto(photo) }
+                        )
+                    }
+                }
             }
             if (entries.isEmpty()) {
                 Text(

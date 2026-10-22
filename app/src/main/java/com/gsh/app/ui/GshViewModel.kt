@@ -1,5 +1,6 @@
 package com.gsh.app.ui
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -15,6 +16,7 @@ import com.gsh.app.data.Food
 import com.gsh.app.data.GshRepository
 import com.gsh.app.data.MealEntry
 import com.gsh.app.data.NutritionTargets
+import com.gsh.app.data.Photo
 import com.gsh.app.data.UserProfile
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -223,6 +225,41 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
 
     fun dismissWeeklyReport() {
         _weeklyReport.value = AiUiState.Idle
+    }
+
+    // ---------- 照片 ----------
+
+    /** 当前所选日期的餐次打卡照片 */
+    val mealPhotos: StateFlow<List<Photo>> =
+        _selectedDate
+            .flatMapLatest { date -> repo.photoDao.observeMealPhotos(date) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 体型照片时间线（新的日期在前） */
+    val bodyPhotos: StateFlow<List<Photo>> =
+        repo.photoDao.observeBodyPhotos()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun photoFile(photo: Photo): File = repo.photoFile(photo)
+
+    /** 保存餐次照片；tempFile 为拍照临时文件，导入完成后清理。 */
+    fun addMealPhoto(uri: Uri, mealType: Int, tempFile: File?) {
+        viewModelScope.launch {
+            repo.savePhoto(uri, Photo.KIND_MEAL, _selectedDate.value, mealType)
+            tempFile?.let { runCatching { it.delete() } }
+        }
+    }
+
+    /** 保存体型照片（记为今天）。 */
+    fun addBodyPhoto(uri: Uri, tempFile: File?) {
+        viewModelScope.launch {
+            repo.savePhoto(uri, Photo.KIND_BODY, DateUtils.today(), Photo.MEAL_NONE)
+            tempFile?.let { runCatching { it.delete() } }
+        }
+    }
+
+    fun deletePhoto(photo: Photo) {
+        viewModelScope.launch { repo.deletePhoto(photo) }
     }
 
     // ---------- 操作 ----------
