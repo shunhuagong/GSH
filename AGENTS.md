@@ -8,9 +8,9 @@
 记录饮食 → 换算蛋白/碳水/脂肪 → 与"体重×每公斤系数"的目标对比 → AI 分析。
 
 - 语言/UI：Kotlin 2.0.21 + Jetpack Compose（Material 3，BOM 2024.12.01）
-- 数据：Room（`gsh.db`，version 3）+ SharedPreferences（SettingsStore）
+- 数据：Room（`gsh.db`，version 4）+ SharedPreferences（SettingsStore）
 - 构建：Gradle 8.11.1 / AGP 8.7.3，compileSdk 35，minSdk 26，Java 17
-- 当前版本：versionName 1.5 / versionCode 6
+- 当前版本：versionName 1.6 / versionCode 7
 
 ## 常用命令
 
@@ -44,14 +44,17 @@ com.gsh.app
 ├── ai/AiAdvisor          # OpenAI 兼容客户端（OkHttp + org.json），单日分析 + 近7天周报 prompt
 └── data/
     ├── Food / MealEntry  # 实体；MealEntry 存营养快照（历史不受食物库修改影响）
-    ├── AppDatabase       # version 3；注意：fallbackToDestructiveMigration 仍在（有数据风险，待移除）
+    ├── Photo / PhotoDao   # 打卡照片（kind：0 餐次 / 1 体型；path 指 filesDir/photos 私有文件）
+    ├── AppDatabase       # version 4；注意：fallbackToDestructiveMigration 仍在（有数据风险，待移除）
     ├── SeedFoods         # 预置食物库（口径：USDA + 中国食物成分表）
-    ├── GshRepository     # 唯一数据入口；seedFoods() 三同步：补插缺失/清理多余/数值修订
+    ├── GshRepository     # 唯一数据入口；seedFoods() 三同步：补插缺失/清理多余/数值修订；照片采样+EXIF 旋转矫正压到 1600px 存 filesDir/photos
     └── SettingsStore     # profile + AiConfig + dynamicColor，StateFlow 通知
 ui/
-├── GshApp                # NavHost + 底部导航（今日/历史/食物库/设置）；页面转场动画
+├── GshApp                # NavHost + 底部导航（今日/历史/变化/食物库/设置）；页面转场动画
 ├── GshViewModel          # 单一 ViewModel；flatMapLatest 派生流；streak 打包计算
-├── TodayScreen           # 三环营养卡+热量大数字+打卡徽章+confetti+餐次卡片+编辑数量对话框
+├── TodayScreen           # 三环营养卡+热量大数字+打卡徽章+confetti+餐次卡片+餐次照片缩略图+编辑数量对话框
+├── BodyScreen            # 「变化」页：体型照片时间线（按日期分组，新→旧，拍照/相册）
+├── Photos                # 拍照/相册选图启动器（免权限方案）+ 全屏大图查看器 + 缩略图
 ├── CopyMealScreen        # 全屏月历复制页（只能从历史拉到今天）
 ├── AddEntryScreen / FoodLibraryScreen / HistoryScreen / SettingsScreen
 └── ConfettiOverlay / AiAnalysisSheet / Theme（含 ProteinColor/CarbsColor/FatColor 固定色）
@@ -68,6 +71,7 @@ ui/
 7. **动态取色**：Material You（Android 12+ 跟随壁纸），设置页有开关，默认开
 8. **数据安全**：手机上有用户真实饮食记录（2026-10-13 起），**严禁任何清数据/卸载/降级操作**；release 包不可 run-as，无法直接读 DB（用截屏验证）
 9. 历史记录存营养快照，改食物库/删条目不影响已有记录
+10. **照片**：餐次照片按餐次挂在今日页（📷 图标），体型照片进「变化」页；照片压缩存 App 私有目录（卸载即清，不进系统相册，拍照/选图均无需敏感权限）；从相册选的照片记为「添加当天」，不读拍摄时间
 
 ## 待办与候选功能（用户未完成，按优先级）
 
@@ -93,5 +97,6 @@ ui/
 | v1.3 (code 4) | 贝贝南瓜入库、AI 分析（单日+周报）、点击记录编辑数量、移除 FAB |
 | v1.4 (code 5) | 复制饮食、日期日历选择器、CSV/JSON 数据导出分享 |
 | v1.5 (code 6) | 美化三件套：🔥打卡徽章 / 🎉全达标彩带 / 🌈动态取色；热量大数字突出（未达标绿/达标红）；复制改全屏月历页（仅今天入口） |
+| v1.6 (code 7) | 拍照打卡：餐次 📷 照片（拍照/相册）；新增「变化」tab（体型照片时间线）；Room v3→v4（photos 表，显式迁移）；引入 Coil（加载）+ ExifInterface（旋转矫正） |
 
 （2026-10-16 之后的功能改动请追加到本表）
