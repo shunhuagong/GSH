@@ -10,7 +10,7 @@
 - 语言/UI：Kotlin 2.0.21 + Jetpack Compose（Material 3，BOM 2024.12.01）
 - 数据：Room（`gsh.db`，version 4）+ SharedPreferences（SettingsStore）
 - 构建：Gradle 8.11.1 / AGP 8.7.3，compileSdk 35，minSdk 26，Java 17
-- 当前版本：versionName 1.6 / versionCode 7
+- 当前版本：versionName 1.7 / versionCode 8
 
 ## 常用命令
 
@@ -50,7 +50,7 @@ com.gsh.app
     ├── GshRepository     # 唯一数据入口；seedFoods() 三同步：补插缺失/清理多余/数值修订；照片采样+EXIF 旋转矫正压到 1600px 存 filesDir/photos
     └── SettingsStore     # profile + AiConfig + dynamicColor，StateFlow 通知
 ui/
-├── GshApp                # NavHost + 底部导航（今日/历史/变化/食物库/设置）；页面转场动画
+├── GshApp                # NavHost + 底部导航（今日/历史/变化/食物库/设置）；页面转场动画；启动插画覆盖层（splash_illustration.webp，约1秒淡出，点击跳过，回前台不重播）
 ├── GshViewModel          # 单一 ViewModel；flatMapLatest 派生流；streak 打包计算
 ├── TodayScreen           # 三环营养卡+热量大数字+打卡徽章+confetti+餐次卡片+餐次照片缩略图+编辑数量对话框
 ├── BodyScreen            # 「变化」页：体型照片时间线（按日期分组，新→旧，拍照/相册）
@@ -98,5 +98,6 @@ ui/
 | v1.4 (code 5) | 复制饮食、日期日历选择器、CSV/JSON 数据导出分享 |
 | v1.5 (code 6) | 美化三件套：🔥打卡徽章 / 🎉全达标彩带 / 🌈动态取色；热量大数字突出（未达标绿/达标红）；复制改全屏月历页（仅今天入口） |
 | v1.6 (code 7) | 拍照打卡：餐次 📷 照片（拍照/相册）；新增「变化」tab（体型照片时间线）；查看器左右滑动切换、连续删除（删一张自动停下一张，caption 显示第 n/m 张）；Room v3→v4（photos 表，显式迁移）；引入 Coil（加载）+ ExifInterface（旋转矫正） |
+| v1.7 (code 8) | 启动页：即梦 AI 生成插画（用户自有素材，构图裁剪去除占位文字条与角标，仅个人自用）+ GSH 字样；约 1 秒淡出、点击跳过、回前台不重播；windowBackground 同步奶油色防闪白 |
 
 （2026-10-16 之后的功能改动请追加到本表）
