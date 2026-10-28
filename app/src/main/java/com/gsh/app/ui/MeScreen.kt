@@ -125,10 +125,10 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .size(30.dp)
+                        .size(15.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
-                        .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape)
                         .clickable { launchers.pickFromGallery() },
                     contentAlignment = Alignment.Center
                 ) {
@@ -136,7 +136,7 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
                         Icons.Filled.Add,
                         contentDescription = "更换头像",
                         tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(10.dp)
                     )
                 }
             }
