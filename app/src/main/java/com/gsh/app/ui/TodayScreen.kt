@@ -54,6 +54,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.gsh.app.ai.AiUiState
 import com.gsh.app.data.DateUtils
 import com.gsh.app.data.Food
@@ -241,21 +242,24 @@ private fun DateHeader(date: String, onChange: (String) -> Unit, streak: Int, ma
     var showPicker by remember { mutableStateOf(false) }
 
     if (showPicker) {
-        AlertDialog(
-            onDismissRequest = { showPicker = false },
-            confirmButton = {},
-            text = {
+        Dialog(onDismissRequest = { showPicker = false }) {
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.padding(8.dp)
+            ) {
                 MonthCalendar(
                     selectedDate = date,
                     onSelectDate = {
-                        onChange(it)
+                        // 先关弹窗再切日期，避免日期变化引发的重组干扰弹窗移除
                         showPicker = false
+                        onChange(it)
                     },
                     allowFuture = true,
                     markOf = markOf
                 )
             }
-        )
+        }
     }
 
     val localDate = DateUtils.parse(date)
