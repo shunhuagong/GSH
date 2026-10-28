@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -18,9 +17,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -34,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -42,11 +38,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -127,10 +121,10 @@ fun AvatarCropDialog(
                                 when {
                                     pressed.size >= 2 -> {
                                         val zoom = event.calculateZoom()
+                                        val pan = event.calculatePan()
                                         if (zoom < 0.98f || zoom > 1.02f) zooming = true
                                         scale = (scale * zoom).coerceIn(1f, 12f)
                                         if (!zooming) {
-                                            val pan = event.calculatePan()
                                             offsetX += pan.x
                                             offsetY += pan.y
                                         }
@@ -150,23 +144,22 @@ fun AvatarCropDialog(
                         }
                     }
             ) {
-                val drawW = bmp.width * baseScale * scale
-                val drawH = bmp.height * baseScale * scale
-                val density = LocalDensity.current
-                Image(
-                    bitmap = bmp.asImageBitmap(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .offset { IntOffset((cx + offsetX - drawW / 2).roundToInt(), (cy + offsetY - drawH / 2).roundToInt()) }
-                        .size(
-                            with(density) { drawW.toDp() },
-                            with(density) { drawH.toDp() }
-                        )
-                )
+                // 图片渲染不用布局系统（Image+offset+size 在部分机型不按预期工作），
+                // 改为 Canvas 直绘：平移到左上角、以总缩放画原尺寸位图，遮罩同层盖在图上
+                val totalScale = baseScale * scale
+                val dstW = bmp.width * totalScale
+                val dstH = bmp.height * totalScale
+                val image = bmp.asImageBitmap()
 
-                // 遮罩：全屏半透明黑挖出圆孔，圆框白描边，即最终头像预览效果
                 Canvas(modifier = Modifier.fillMaxSize()) {
+                    withTransform({
+                        translate(cx + offsetX - dstW / 2f, cy + offsetY - dstH / 2f)
+                        scale(totalScale, totalScale, pivot = Offset.Zero)
+                    }) {
+                        drawImage(image)
+                    }
+
+                    // 遮罩：全屏半透明黑挖出圆孔，圆框白描边，即最终头像预览效果
                     val mask = Path().apply {
                         addRect(Rect(0f, 0f, size.width, size.height))
                         addOval(Rect(cx - frame / 2, cy - frame / 2, cx + frame / 2, cy + frame / 2))
