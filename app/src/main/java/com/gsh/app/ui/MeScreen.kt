@@ -145,7 +145,7 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .align(Alignment.BottomVertically)
+                    .align(Alignment.Bottom)
             ) {
                 val info = buildString {
                     append(trimNum(profile.weightKg)).append(" kg")
