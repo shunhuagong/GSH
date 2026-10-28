@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.gsh.app.R
@@ -45,6 +48,7 @@ import com.gsh.app.data.Photo
 @Composable
 fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
     val avatarPhoto: Photo? = vm.avatar.collectAsState().value
+    val stats by vm.last30Stats.collectAsState()
 
     // 选完图先弹裁剪界面：缩放/拖动确认后才保存
     var cropUri by remember { mutableStateOf<Uri?>(null) }
@@ -124,5 +128,41 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
                 Icon(Icons.Outlined.Settings, contentDescription = "设置")
             }
         }
+
+        // 近30天成绩：打卡天数 / 蛋白达标 / 训练日
+        Spacer(Modifier.height(32.dp))
+        Text(
+            "🔥 近30天",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 16.dp)
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            StatBlock("饮食打卡", "${stats.loggedDays} 天", Modifier.weight(1f))
+            StatBlock("蛋白达标", "${stats.proteinHitDays} 天", Modifier.weight(1f))
+            StatBlock("训练日", "${stats.trainingDays} 天", Modifier.weight(1f))
+        }
+    }
+}
+
+/** 三列成绩块：大数字 + 灰色小标签。 */
+@Composable
+private fun StatBlock(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(value, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

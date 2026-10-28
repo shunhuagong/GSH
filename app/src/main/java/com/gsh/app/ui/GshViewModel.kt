@@ -35,6 +35,13 @@ import java.io.File
 @OptIn(ExperimentalCoroutinesApi::class)
 class GshViewModel(private val repo: GshRepository) : ViewModel() {
 
+    /** 近30天成绩：饮食打卡天数、蛋白达标天数、明确标记的训练日天数。 */
+    data class Last30Stats(
+        val loggedDays: Int,
+        val proteinHitDays: Int,
+        val trainingDays: Int
+    )
+
     init {
         viewModelScope.launch { repo.seedFoods() }
     }
@@ -120,6 +127,21 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
     fun setDayType(date: String, isTraining: Boolean) {
         viewModelScope.launch { repo.setDayType(date, isTraining) }
     }
+
+    /** 近30天成绩：打卡/达标以有饮食记录的天计，训练日只统计明确标记过的。 */
+    val last30Stats: StateFlow<Last30Stats> =
+        combine(dailyTotals, dayTypes, profile) { totals, types, p ->
+            val start = DateUtils.format(DateUtils.parse(DateUtils.today()).minusDays(29))
+            val recent = totals.filter { it.date >= start }
+            val proteinTarget = p.weightKg * p.proteinPerKg
+            val proteinHits = recent.count { it.protein >= proteinTarget }
+            val trainingDays = types.entries.count { (d, isTraining) -> isTraining && d >= start }
+            Last30Stats(recent.size, proteinHits, trainingDays)
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            Last30Stats(0, 0, 0)
+        )
 
     // ---------- 食物搜索 ----------
 
