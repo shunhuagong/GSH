@@ -30,8 +30,6 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -42,7 +40,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -76,6 +73,9 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
     val dailyAnalysis by vm.dailyAnalysis.collectAsState()
     val streak by vm.streak.collectAsState()
     val mealPhotos by vm.mealPhotos.collectAsState()
+    // 月历标记：有记录的日子按训练/休息显示 💪/😴
+    val dayTypes by vm.dayTypes.collectAsState()
+    val totals by vm.dailyTotals.collectAsState()
 
     var editingEntry by remember { mutableStateOf<MealEntry?>(null) }
     var celebrationTick by remember { mutableStateOf(0) }
@@ -164,7 +164,19 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-        item { DateHeader(date = date, onChange = vm::selectDate, streak = streak) }
+        item {
+            val loggedDates = remember(totals) { totals.map { it.date }.toSet() }
+            DateHeader(
+                date = date,
+                onChange = vm::selectDate,
+                streak = streak,
+                markOf = { d ->
+                    if (d in loggedDates) {
+                        if (dayTypes[d] ?: true) "💪" else "😴"
+                    } else null
+                }
+            )
+        }
         item {
             DayTypeToggle(
                 isTraining = isTrainingDay,
@@ -224,29 +236,26 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DateHeader(date: String, onChange: (String) -> Unit, streak: Int) {
+private fun DateHeader(date: String, onChange: (String) -> Unit, streak: Int, markOf: (String) -> String?) {
     var showPicker by remember { mutableStateOf(false) }
 
     if (showPicker) {
-        val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = DateUtils.toEpochMillis(date)
-        )
-        DatePickerDialog(
+        AlertDialog(
             onDismissRequest = { showPicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    pickerState.selectedDateMillis?.let { onChange(DateUtils.fromEpochMillis(it)) }
-                    showPicker = false
-                }) { Text("确定") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPicker = false }) { Text("取消") }
+            confirmButton = {},
+            text = {
+                MonthCalendar(
+                    selectedDate = date,
+                    onSelectDate = {
+                        onChange(it)
+                        showPicker = false
+                    },
+                    allowFuture = true,
+                    markOf = markOf
+                )
             }
-        ) {
-            DatePicker(state = pickerState)
-        }
+        )
     }
 
     val localDate = DateUtils.parse(date)

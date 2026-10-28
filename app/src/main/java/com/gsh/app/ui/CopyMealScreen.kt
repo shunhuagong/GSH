@@ -13,26 +13,25 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.DatePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.gsh.app.data.DateUtils
 import com.gsh.app.data.MealEntry
 
 /** 从历史某天复制饮食到今天：全屏月历选日期，实时预览内容后确认。 */
@@ -40,23 +39,17 @@ import com.gsh.app.data.MealEntry
 @Composable
 fun CopyMealScreen(vm: GshViewModel, onDone: () -> Unit) {
     val previewEntries by vm.copyPreviewEntries.collectAsState()
+    val dayTypes by vm.dayTypes.collectAsState()
+    val totals by vm.dailyTotals.collectAsState()
+    val loggedDates = remember(totals) { totals.map { it.date }.toSet() }
 
     // 离开页面时清掉预览日期
     DisposableEffect(Unit) {
         onDispose { vm.setCopyPreviewDate(null) }
     }
 
-    // 只允许选择今天之前的日期：历史作为事实来源，复制目标永远是今天
-    val pickerState = rememberDatePickerState(
-        selectableDates = object : SelectableDates {
-            override fun isSelectableDate(utcTimeMillis: Long): Boolean =
-                utcTimeMillis < DateUtils.toEpochMillis(DateUtils.today())
-        }
-    )
-
-    LaunchedEffect(pickerState.selectedDateMillis) {
-        vm.setCopyPreviewDate(pickerState.selectedDateMillis?.let { DateUtils.fromEpochMillis(it) })
-    }
+    var selected by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(selected) { vm.setCopyPreviewDate(selected) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -73,10 +66,19 @@ fun CopyMealScreen(vm: GshViewModel, onDone: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
         ) {
-            DatePicker(state = pickerState)
+            MonthCalendar(
+                selectedDate = selected,
+                onSelectDate = { selected = it },
+                allowFuture = false,
+                markOf = { date ->
+                    if (date in loggedDates) {
+                        if (dayTypes[date] ?: true) "💪" else "😴"
+                    } else null
+                }
+            )
             Spacer(Modifier.height(12.dp))
             when {
-                pickerState.selectedDateMillis == null -> Text(
+                selected == null -> Text(
                     "点击日期查看那天的饮食内容",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp
@@ -103,13 +105,13 @@ fun CopyMealScreen(vm: GshViewModel, onDone: () -> Unit) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 Button(
                     onClick = {
-                        val millis = pickerState.selectedDateMillis
-                        if (millis != null) {
-                            vm.copyToToday(DateUtils.fromEpochMillis(millis)) { }
+                        val from = selected
+                        if (from != null) {
+                            vm.copyToToday(from) { }
                             onDone()
                         }
                     },
-                    enabled = pickerState.selectedDateMillis != null && previewEntries.isNotEmpty(),
+                    enabled = selected != null && previewEntries.isNotEmpty(),
                     modifier = Modifier.weight(1f)
                 ) { Text("确定复制") }
                 Spacer(Modifier.width(8.dp))
