@@ -5,7 +5,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,8 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,9 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.gsh.app.R
 import com.gsh.app.data.BmiLevel
@@ -49,8 +48,8 @@ import com.gsh.app.data.HealthMetrics
 import com.gsh.app.data.Photo
 
 /**
- * 「我」页：个人信息与健康指标的展示位。
- * 头像默认用启动插画，点击从相册选图更换；编辑入口在右上角齿轮 → 设置。
+ * 「我」页：头像 + 右侧身体信息小字（底部并齐），齿轮进设置编辑。
+ * 头像默认用启动插画，右下角 + 角标从相册选图更换。
  */
 @Composable
 fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
@@ -89,7 +88,6 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
             .fillMaxSize()
             .statusBarsPadding()
     ) {
-        // 头像顶到状态栏正下方，与右上角齿轮同一行，压缩顶部留白
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -140,8 +138,55 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
                     )
                 }
             }
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = onOpenSettings) {
+
+            Spacer(Modifier.width(12.dp))
+
+            // 身体信息小字，整体与头像底部并齐
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .align(Alignment.BottomVertically)
+            ) {
+                val info = buildString {
+                    append(trimNum(profile.weightKg)).append(" kg")
+                    if (infoLine.isNotEmpty()) append(" · ").append(infoLine)
+                }
+                Text(info, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(3.dp))
+                if (health != null) {
+                    Text(
+                        buildAnnotatedString {
+                            append("BMI %.1f（".format(health.bmi))
+                            withStyle(SpanStyle(color = bmiColor(health.bmiLevel), fontWeight = FontWeight.Bold)) {
+                                append(health.bmiLevel.label)
+                            }
+                            append("）")
+                            health.bmr?.let { append(" · 基础代谢约 %.0f kcal/天".format(it)) }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Text(
+                        "去设置填写身高，可查看 BMI 与基础代谢",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clickable { onOpenSettings() }
+                    )
+                }
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "🔥 连续打卡 $streak 天",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            IconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.align(Alignment.Top)
+            ) {
                 Icon(Icons.Outlined.Settings, contentDescription = "设置")
             }
         }
@@ -151,110 +196,13 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 16.dp, top = 4.dp)
         )
-
-        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            Spacer(Modifier.height(16.dp))
-
-            // 个人信息卡
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "${trimNum(profile.weightKg)} kg",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 36.sp
-                    )
-                    if (infoLine.isNotEmpty()) {
-                        Text(
-                            infoLine,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        Text(
-                            "去设置页完善性别 / 身高 / 年龄",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.clickable { onOpenSettings() }
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "🔥 连续打卡 $streak 天",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // 健康指标卡（BMI / 基础代谢），点击进设置编辑
-            if (health != null) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onOpenSettings() }
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "BMI %.1f".format(health.bmi),
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                health.bmiLevel.label,
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = when (health.bmiLevel) {
-                                    BmiLevel.HEALTHY -> CarbsColor
-                                    BmiLevel.UNDERWEIGHT, BmiLevel.OVERWEIGHT -> FatColor
-                                    BmiLevel.OBESE -> MaterialTheme.colorScheme.error
-                                }
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "健康体重范围：%.1f ~ %.1f kg"
-                                .format(health.healthyWeightRange.start, health.healthyWeightRange.endInclusive),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (health.bmr != null) {
-                            Text(
-                                "基础代谢约 %.0f kcal/天（Mifflin-St Jeor 公式）"
-                                    .format(health.bmr),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        } else {
-                            Text(
-                                "填写性别与年龄后可查看基础代谢",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(
-                            "增肌期肌肉量大，BMI 偏高属正常，仅供参考",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("健康指标", fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "填写身高与体重后，这里会展示 BMI 分级与健康体重范围。",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Button(onClick = onOpenSettings) {
-                            Text("去设置填写")
-                        }
-                    }
-                }
-            }
-        }
     }
+}
+
+/** BMI 分级配色：健康绿 / 偏瘦、超重橙 / 肥胖红，与设置页口径一致。 */
+@Composable
+private fun bmiColor(level: BmiLevel) = when (level) {
+    BmiLevel.HEALTHY -> CarbsColor
+    BmiLevel.UNDERWEIGHT, BmiLevel.OVERWEIGHT -> FatColor
+    BmiLevel.OBESE -> MaterialTheme.colorScheme.error
 }
