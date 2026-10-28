@@ -8,7 +8,10 @@ import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -113,11 +116,28 @@ fun AvatarCropDialog(
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(bmp) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            scale = (scale * zoom).coerceIn(1f, 6f)
-                            offsetX += pan.x
-                            offsetY += pan.y
-                            clampOffset()
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            do {
+                                val event = awaitPointerEvent()
+                                val pressed = event.changes.filter { it.pressed }
+                                when {
+                                    // 双指捏合：只缩放，锚点固定在图片中心（放大从中心向外扩），
+                                    // 忽略捏合时手指中心漂移带来的平移干扰
+                                    pressed.size >= 2 -> {
+                                        scale = (scale * event.calculateZoom()).coerceIn(1f, 6f)
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                    // 单指拖动：只平移取景
+                                    pressed.size == 1 -> {
+                                        val pan = event.calculatePan()
+                                        offsetX += pan.x
+                                        offsetY += pan.y
+                                        clampOffset()
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                }
+                            } while (event.changes.any { it.pressed })
                         }
                     }
             ) {
