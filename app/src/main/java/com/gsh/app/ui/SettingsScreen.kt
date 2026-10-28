@@ -59,9 +59,8 @@ fun SettingsScreen(vm: GshViewModel) {
     var height by remember(profile) {
         mutableStateOf(if (profile.heightCm > 0) trimNum(profile.heightCm) else "")
     }
-    var birthYear by remember(profile) {
-        mutableStateOf(if (profile.birthYear > 0) profile.birthYear.toString() else "")
-    }
+    // 输入年龄，内部换算成出生年存储（明年打开自动 +1，无需手动改）
+    var age by remember(profile) { mutableStateOf(profile.age()?.toString() ?: "") }
     var gender by remember(profile) { mutableStateOf(profile.gender) }
     var protein by remember(profile) { mutableStateOf(trimNum(profile.proteinPerKg)) }
     var carbsTraining by remember(profile) { mutableStateOf(trimNum(profile.carbsTrainingPerKg)) }
@@ -88,24 +87,25 @@ fun SettingsScreen(vm: GshViewModel) {
 
     val w = weight.toDoubleOrNull()
     val h = height.toDoubleOrNull()
-    val by = birthYear.toIntOrNull()
+    val ageNum = age.toIntOrNull()
     val p = protein.toDoubleOrNull()
     val ct = carbsTraining.toDoubleOrNull()
     val cr = carbsRest.toDoubleOrNull()
     val f = fat.toDoubleOrNull()
-    // 身高 / 出生年为选填：留空视为未填写，填了则必须在合理范围
+    // 身高 / 年龄为选填：留空视为未填写，填了则必须在合理范围
     val heightFilled = h != null && h in 50.0..280.0
     val heightValid = height.isBlank() || heightFilled
-    val birthYearValid = birthYear.isBlank() || (by != null && by in 1900..LocalDate.now().year)
+    val ageValid = age.isBlank() || (ageNum != null && ageNum in 10..100)
     val valid = w != null && w > 0 && p != null && p > 0 &&
         ct != null && ct > 0 && cr != null && cr > 0 && f != null && f >= 0 &&
-        heightValid && birthYearValid
+        heightValid && ageValid
 
     // 根据当前输入实时计算健康指标（BMI / 分级 / 基础代谢）
     val health = if (w != null && w > 0 && heightFilled) {
         HealthMetrics.from(
             UserProfile(
-                weightKg = w, heightCm = h!!, gender = gender, birthYear = by ?: 0
+                weightKg = w, heightCm = h!!, gender = gender,
+                birthYear = if (ageNum != null) LocalDate.now().year - ageNum else 0
             )
         )
     } else null
@@ -182,10 +182,10 @@ fun SettingsScreen(vm: GshViewModel) {
                     modifier = Modifier.weight(1f)
                 )
                 OutlinedTextField(
-                    value = birthYear,
-                    onValueChange = { birthYear = it },
-                    label = { Text("出生年份") },
-                    suffix = { Text("年") },
+                    value = age,
+                    onValueChange = { age = it },
+                    label = { Text("年龄") },
+                    suffix = { Text("岁") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.weight(1f)
@@ -228,7 +228,7 @@ fun SettingsScreen(vm: GshViewModel) {
                             )
                         } else {
                             Text(
-                                "填写性别与出生年份后可查看基础代谢",
+                                "填写性别与年龄后可查看基础代谢",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -318,7 +318,9 @@ fun SettingsScreen(vm: GshViewModel) {
                     vm.updateProfile(
                         UserProfile(
                             weightKg = w!!, heightCm = if (heightFilled) h!! else 0.0,
-                            gender = gender, birthYear = by ?: 0,
+                            gender = gender,
+                            birthYear = if (age.isNotBlank() && ageNum != null)
+                                LocalDate.now().year - ageNum else 0,
                             proteinPerKg = p!!, carbsTrainingPerKg = ct!!,
                             carbsRestPerKg = cr!!, fatPerKg = f!!
                         )
