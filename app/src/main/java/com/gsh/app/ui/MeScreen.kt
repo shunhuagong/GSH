@@ -87,19 +87,13 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
             .fillMaxSize()
             .statusBarsPadding()
     ) {
-        // 右上角齿轮进设置
+        // 头像顶到状态栏正下方，与右上角齿轮同一行，压缩顶部留白
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.End
+                .padding(start = 16.dp, end = 4.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            IconButton(onClick = onOpenSettings) {
-                Icon(Icons.Outlined.Settings, contentDescription = "设置")
-            }
-        }
-
-        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             // 头像：相册选的（点击更换）；未设置时用启动插画作默认头像
             Box(
                 modifier = Modifier
@@ -124,13 +118,19 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
                     )
                 }
             }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "点击头像可更换",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onOpenSettings) {
+                Icon(Icons.Outlined.Settings, contentDescription = "设置")
+            }
+        }
+        Text(
+            "点击头像可更换",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+        )
 
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Spacer(Modifier.height(16.dp))
 
             // 个人信息卡
