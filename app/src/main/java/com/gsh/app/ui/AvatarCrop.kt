@@ -128,7 +128,7 @@ fun AvatarCropDialog(
                                     pressed.size >= 2 -> {
                                         val zoom = event.calculateZoom()
                                         if (zoom < 0.98f || zoom > 1.02f) zooming = true
-                                        scale = (scale * zoom).coerceIn(1f, 6f)
+                                        scale = (scale * zoom).coerceIn(1f, 12f)
                                         if (!zooming) {
                                             val pan = event.calculatePan()
                                             offsetX += pan.x
@@ -263,5 +263,52 @@ private fun decodeForCrop(resolver: ContentResolver, uri: Uri): Bitmap? {
         bitmap.recycle()
         bitmap = solid
     }
+
+    // 素材图常带纯色底板（透明图保存时铺黑/白），内容只占一角，
+    // 连底板一起缩放毫无意义——裁掉四周纯色边，缩放针对内容本身
+    val trimmed = trimUniformBorder(bitmap)
+    if (trimmed !== bitmap) {
+        bitmap.recycle()
+        bitmap = trimmed
+    }
     return bitmap
+}
+
+/** 裁掉四周纯色边框（以左上角为基准色，带 ±8 容忍）；无边或内容贴边则原样返回。 */
+private fun trimUniformBorder(src: Bitmap): Bitmap {
+    val w = src.width
+    val h = src.height
+    val corner = src.getPixel(0, 0)
+
+    fun uniformRow(y: Int): Boolean {
+        val row = IntArray(w)
+        src.getPixels(row, 0, w, 0, y, w, 1)
+        return row.all { nearColor(it, corner) }
+    }
+
+    fun uniformCol(x: Int): Boolean {
+        val col = IntArray(h)
+        src.getPixels(col, 0, 1, x, 0, 1, h)
+        return col.all { nearColor(it, corner) }
+    }
+
+    var top = 0
+    while (top < h / 2 && uniformRow(top)) top++
+    var bottom = h - 1
+    while (bottom > h / 2 && uniformRow(bottom)) bottom--
+    var left = 0
+    while (left < w / 2 && uniformCol(left)) left++
+    var right = w - 1
+    while (right > w / 2 && uniformCol(right)) right--
+    if (right - left + 1 <= 0 || bottom - top + 1 <= 0) return src
+
+    val trimmed = Bitmap.createBitmap(src, left, top, right - left + 1, bottom - top + 1)
+    return if (trimmed != src) trimmed else src
+}
+
+private fun nearColor(a: Int, b: Int): Boolean {
+    val dr = Math.abs((a shr 16 and 0xFF) - (b shr 16 and 0xFF))
+    val dg = Math.abs((a shr 8 and 0xFF) - (b shr 8 and 0xFF))
+    val db = Math.abs((a and 0xFF) - (b and 0xFF))
+    return dr <= 8 && dg <= 8 && db <= 8
 }
