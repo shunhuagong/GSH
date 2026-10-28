@@ -129,15 +129,15 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         viewModelScope.launch { repo.setDayType(date, isTraining) }
     }
 
-    /** 近30天成绩：打卡/达标以有饮食记录的天计，训练日只统计明确标记过的。 */
+    /** 近30天成绩：打卡/达标以有饮食记录的天计；训练日沿用全局口径（未标记即训练日，只扣明确标记的休息日）。 */
     val last30Stats: StateFlow<Last30Stats> =
         combine(dailyTotals, dayTypes, profile) { totals, types, p ->
             val start = DateUtils.format(DateUtils.parse(DateUtils.today()).minusDays(29))
             val recent = totals.filter { it.date >= start }
             val proteinTarget = p.weightKg * p.proteinPerKg
             val proteinHits = recent.count { it.protein >= proteinTarget }
-            val trainingDays = types.entries.count { (d, isTraining) -> isTraining && d >= start }
-            Last30Stats(recent.size, proteinHits, trainingDays)
+            val restDays = types.entries.count { (d, isTraining) -> !isTraining && d >= start }
+            Last30Stats(recent.size, proteinHits, 30 - restDays)
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5_000),
