@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [Food::class, MealEntry::class, DayType::class, Photo::class],
-    version = 4,
+    entities = [Food::class, MealEntry::class, DayType::class, Photo::class, WeightLog::class],
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -19,6 +19,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun dailyTotalDao(): DailyTotalDao
     abstract fun dayTypeDao(): DayTypeDao
     abstract fun photoDao(): PhotoDao
+    abstract fun weightLogDao(): WeightLogDao
 
     companion object {
         @Volatile
@@ -47,6 +48,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v4 → v5：新增 weight_logs 表（体重记录，一天一条），保留所有已有数据。 */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `weight_logs` " +
+                        "(`date` TEXT NOT NULL, `weightKg` REAL NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, PRIMARY KEY(`date`))"
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -54,7 +66,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gsh.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     // 其他未显式迁移的版本变更才走重建（早期开发阶段保护）
                     .fallbackToDestructiveMigration()
                     .build()

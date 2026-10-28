@@ -27,6 +27,7 @@ class GshRepository(context: Context) {
     val dailyTotalDao: DailyTotalDao = db.dailyTotalDao()
     val dayTypeDao: DayTypeDao = db.dayTypeDao()
     val photoDao: PhotoDao = db.photoDao()
+    val weightLogDao: WeightLogDao = db.weightLogDao()
     val settings: SettingsStore = SettingsStore(context)
     val searchHistory: SearchHistoryStore = SearchHistoryStore(context)
 
@@ -35,6 +36,15 @@ class GshRepository(context: Context) {
 
     suspend fun setDayType(date: String, isTraining: Boolean) {
         dayTypeDao.upsert(DayType(date, isTraining))
+    }
+
+    /** 记录体重（当天重复记则覆盖），并同步更新设置里的体重，营养目标随之变化。 */
+    suspend fun recordWeight(date: String, weightKg: Double) {
+        weightLogDao.upsert(WeightLog(date, weightKg, System.currentTimeMillis()))
+        val p = settings.profile.value
+        if (p.weightKg != weightKg) {
+            settings.updateProfile(p.copy(weightKg = weightKg))
+        }
     }
 
     /**

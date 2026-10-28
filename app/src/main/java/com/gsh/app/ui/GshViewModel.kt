@@ -19,6 +19,7 @@ import com.gsh.app.data.MealEntry
 import com.gsh.app.data.NutritionTargets
 import com.gsh.app.data.Photo
 import com.gsh.app.data.UserProfile
+import com.gsh.app.data.WeightLog
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -381,6 +382,18 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
 
     fun updateProfile(profile: UserProfile) {
         repo.settings.updateProfile(profile)
+    }
+
+    // ---------- 体重历史 ----------
+
+    /** 全部体重记录，旧日期在前。 */
+    val weightLogs: StateFlow<List<WeightLog>> =
+        repo.weightLogDao.observeAll()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 记录今日体重（重复记则覆盖），并同步更新设置里的体重。 */
+    fun recordWeight(weightKg: Double) {
+        viewModelScope.launch { repo.recordWeight(DateUtils.today(), weightKg) }
     }
 
     companion object {
