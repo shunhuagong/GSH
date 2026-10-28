@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccessibilityNew
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Restaurant
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -60,7 +60,7 @@ private val tabs = listOf(
     Tab("history", "历史", Icons.Outlined.History),
     Tab("body", "变化", Icons.Outlined.AccessibilityNew),
     Tab("foods", "食物库", Icons.Outlined.Restaurant),
-    Tab("settings", "设置", Icons.Outlined.Settings)
+    Tab("me", "我", Icons.Outlined.Person)
 )
 
 /** 启动页奶油底色（与插画边缘一致，整页视觉无缝） */
@@ -158,8 +158,16 @@ fun GshApp(vm: GshViewModel = viewModel(factory = GshViewModel.Factory)) {
                 composable("foods") {
                     FoodLibraryScreen(vm = vm)
                 }
+                composable("me") {
+                    MeScreen(
+                        vm = vm,
+                        onOpenSettings = { navController.navigate("settings") },
+                        onOpenBody = { navigateToTab("body") }
+                    )
+                }
+                // 设置改为「我」页进入的二级页（不显示底部导航）
                 composable("settings") {
-                    SettingsScreen(vm = vm)
+                    SettingsScreen(vm = vm, onBack = { navController.popBackStack() })
                 }
             }
         }

@@ -10,14 +10,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -42,16 +45,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.gsh.app.data.AiConfig
-import com.gsh.app.data.BmiLevel
 import com.gsh.app.data.Gender
-import com.gsh.app.data.HealthMetrics
 import com.gsh.app.data.UserProfile
 import java.io.File
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: GshViewModel) {
+fun SettingsScreen(vm: GshViewModel, onBack: () -> Unit) {
     val profile by vm.profile.collectAsState()
     val aiConfig by vm.aiConfig.collectAsState()
 
@@ -100,16 +101,6 @@ fun SettingsScreen(vm: GshViewModel) {
         ct != null && ct > 0 && cr != null && cr > 0 && f != null && f >= 0 &&
         heightValid && ageValid
 
-    // 根据当前输入实时计算健康指标（BMI / 分级 / 基础代谢）
-    val health = if (w != null && w > 0 && heightFilled) {
-        HealthMetrics.from(
-            UserProfile(
-                weightKg = w, heightCm = h!!, gender = gender,
-                birthYear = if (ageNum != null) LocalDate.now().year - ageNum else 0
-            )
-        )
-    } else null
-
     // 根据当前输入实时计算两套目标
     val tProtein = if (w != null && p != null) w * p else 0.0
     val tCarbsTraining = if (w != null && ct != null) w * ct else 0.0
@@ -123,7 +114,14 @@ fun SettingsScreen(vm: GshViewModel) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        TopAppBar(title = { Text("设置") })
+        TopAppBar(
+            title = { Text("设置") },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                }
+            }
+        )
 
         Column(modifier = Modifier.padding(16.dp)) {
             Text("外观", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -190,56 +188,6 @@ fun SettingsScreen(vm: GshViewModel) {
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
-            }
-
-            if (health != null) {
-                Spacer(Modifier.height(8.dp))
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "BMI %.1f".format(health.bmi),
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                health.bmiLevel.label,
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = when (health.bmiLevel) {
-                                    BmiLevel.HEALTHY -> CarbsColor
-                                    BmiLevel.UNDERWEIGHT, BmiLevel.OVERWEIGHT -> FatColor
-                                    BmiLevel.OBESE -> MaterialTheme.colorScheme.error
-                                }
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "该身高的健康体重范围：%.1f ~ %.1f kg"
-                                .format(health.healthyWeightRange.start, health.healthyWeightRange.endInclusive),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (health.bmr != null) {
-                            Text(
-                                "基础代谢约 %.0f kcal/天（Mifflin-St Jeor 公式）"
-                                    .format(health.bmr),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        } else {
-                            Text(
-                                "填写性别与年龄后可查看基础代谢",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(
-                            "增肌期肌肉量大，BMI 偏高属正常，仅供参考",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -415,7 +363,7 @@ fun SettingsScreen(vm: GshViewModel) {
 }
 
 /** 整数不带小数点；小数先四舍五入到两位，去掉 Float 存储带来的精度尾巴（如 0.8 读回 0.800000011…）。 */
-private fun trimNum(value: Double): String {
+fun trimNum(value: Double): String {
     val rounded = Math.round(value * 100) / 100.0
     return if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString() else rounded.toString()
 }
