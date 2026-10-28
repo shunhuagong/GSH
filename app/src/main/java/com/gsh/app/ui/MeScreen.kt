@@ -1,5 +1,6 @@
 package com.gsh.app.ui
 
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,6 +28,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,8 +57,20 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
     val avatarPhoto: Photo? = vm.avatar.collectAsState().value
     val health = HealthMetrics.from(profile)
 
+    // 选完图先弹裁剪界面：缩放/拖动确认后才保存
+    var cropUri by remember { mutableStateOf<Uri?>(null) }
     val launchers = rememberPhotoLaunchers { uri, _ ->
-        uri?.let(vm::changeAvatar)
+        uri?.let { cropUri = it }
+    }
+    cropUri?.let { uri ->
+        AvatarCropDialog(
+            uri = uri,
+            onConfirm = { bitmap ->
+                vm.changeAvatar(bitmap)
+                cropUri = null
+            },
+            onDismiss = { cropUri = null }
+        )
     }
 
     val genderLabel = when (profile.gender) {

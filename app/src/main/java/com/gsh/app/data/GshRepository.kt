@@ -197,6 +197,44 @@ class GshRepository(context: Context) {
         withContext(Dispatchers.IO) { File(appContext.filesDir, photo.path).delete() }
     }
 
+    /**
+     * 保存头像：接收裁剪界面确认后的正方形位图（EXIF 已转正），
+     * 最长边压到 MAX_AVATAR_DIMENSION 存为 JPEG 入库；失败清理半成品文件。
+     */
+    suspend fun saveAvatar(source: Bitmap): Boolean = withContext(Dispatchers.IO) {
+        val maxSide = maxOf(source.width, source.height)
+        val bitmap = if (maxSide > MAX_AVATAR_DIMENSION) {
+            val scale = MAX_AVATAR_DIMENSION.toFloat() / maxSide
+            Bitmap.createScaledBitmap(
+                source,
+                (source.width * scale).toInt().coerceAtLeast(1),
+                (source.height * scale).toInt().coerceAtLeast(1),
+                true
+            )
+        } else source
+
+        val relative = "photos/avatar"
+        val dir = File(appContext.filesDir, relative).apply { mkdirs() }
+        val file = File(dir, "${System.currentTimeMillis()}.jpg")
+        val ok = FileOutputStream(file).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, PHOTO_JPEG_QUALITY, out)
+        }
+        if (!ok) {
+            file.delete()
+            return@withContext false
+        }
+        photoDao.insert(
+            Photo(
+                kind = Photo.KIND_AVATAR,
+                date = DateUtils.today(),
+                mealType = Photo.MEAL_NONE,
+                path = "$relative/${file.name}",
+                createdAt = System.currentTimeMillis()
+            )
+        )
+        true
+    }
+
     /** 照片对应的私有文件（展示用）。 */
     fun photoFile(photo: Photo): File = File(appContext.filesDir, photo.path)
 
@@ -279,6 +317,7 @@ class GshRepository(context: Context) {
     companion object {
         /** 照片最长边像素，超出等比压小以控制存储体积 */
         private const val MAX_PHOTO_DIMENSION = 1600
+        private const val MAX_AVATAR_DIMENSION = 512
 
         /** 照片 JPEG 压缩质量 */
         private const val PHOTO_JPEG_QUALITY = 85

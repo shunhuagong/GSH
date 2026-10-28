@@ -1,5 +1,6 @@
 package com.gsh.app.ui
 
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -245,11 +246,11 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         repo.photoDao.observeAvatar()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** 从相册换头像：保存成功后清理旧文件。 */
-    fun changeAvatar(uri: Uri) {
+    /** 换头像：裁剪界面确认后的位图；保存成功后清理旧文件。 */
+    fun changeAvatar(bitmap: Bitmap) {
         viewModelScope.launch {
             val old = avatar.value
-            if (repo.savePhoto(uri, Photo.KIND_AVATAR, DateUtils.today(), Photo.MEAL_NONE)) {
+            if (repo.saveAvatar(bitmap)) {
                 old?.let { repo.deletePhoto(it) }
             }
         }
