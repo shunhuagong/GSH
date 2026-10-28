@@ -78,7 +78,6 @@ fun HistoryScreen(vm: GshViewModel, onDayClick: (String) -> Unit) {
                         isTraining = isTraining,
                         targets = NutritionTargets.from(profile, isTraining),
                         onClick = { onDayClick(total.date) },
-                        onToggleDayType = { vm.setDayType(total.date, !isTraining) },
                         modifier = Modifier.animateItem()
                     )
                 }
@@ -93,7 +92,6 @@ private fun DailyTotalCard(
     isTraining: Boolean,
     targets: NutritionTargets,
     onClick: () -> Unit,
-    onToggleDayType: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -116,8 +114,7 @@ private fun DailyTotalCard(
                     text = if (isTraining) "💪 训练日" else "😴 休息日",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onToggleDayType() }
+                    fontWeight = FontWeight.Bold
                 )
             }
             Spacer(Modifier.height(4.dp))

@@ -1,10 +1,8 @@
 package com.gsh.app.ui
 
 import android.util.Log
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,16 +41,13 @@ private const val TAG = "MonthCal"
  * 自绘月历（替换官方 DatePicker——后者不支持在日期格子里加自定义标记）。
  * 周一开始；今天主色高亮、选中主色圆底；未来日期可按需禁用；
  * markOf 返回非空时在日数字下方显示小标记（如 💪 / 😴）。
- * onToggleDayType 非空时，长按日期切换该天训练/休息标记（用于修正账本）。
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MonthCalendar(
     selectedDate: String?,
     onSelectDate: (String) -> Unit,
     allowFuture: Boolean = false,
-    markOf: (String) -> String? = { null },
-    onToggleDayType: ((String) -> Unit)? = null
+    markOf: (String) -> String? = { null }
 ) {
     val today = remember { DateUtils.today() }
     var anchor by remember(selectedDate) {
@@ -122,8 +117,7 @@ fun MonthCalendar(
                             onSelect = {
                                 Log.d(TAG, "tap $dateStr")
                                 onSelectDate(dateStr)
-                            },
-                            onToggle = onToggleDayType?.let { toggle -> { toggle(dateStr) } }
+                            }
                         )
                     } else {
                         Spacer(modifier = Modifier.weight(1f))
@@ -131,21 +125,9 @@ fun MonthCalendar(
                 }
             }
         }
-        if (onToggleDayType != null) {
-            Text(
-                "长按日期可切换 💪训练 / 😴休息",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp)
-            )
-        }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RowScope.DayCell(
     date: String,
@@ -154,8 +136,7 @@ private fun RowScope.DayCell(
     isSelected: Boolean,
     enabled: Boolean,
     mark: String?,
-    onSelect: () -> Unit,
-    onToggle: (() -> Unit)? = null
+    onSelect: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -164,14 +145,7 @@ private fun RowScope.DayCell(
             .padding(1.dp)
             .clip(CircleShape)
             .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-            .then(
-                if (!enabled) Modifier
-                else if (onToggle != null) Modifier.combinedClickable(
-                    onClick = onSelect,
-                    onLongClick = onToggle
-                )
-                else Modifier.clickable { onSelect() }
-            )
+            .then(if (enabled) Modifier.clickable { onSelect() } else Modifier)
             .padding(vertical = 3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
