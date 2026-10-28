@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -88,11 +89,15 @@ fun MonthCalendar(
             }
         }
 
-        // 日期网格：固定 6 行（纸质日历习惯），不足补空行，避免切月时高度跳变
+        // 日期网格：固定 6 行、每行固定高度（不足的月份补空行），切月时尺寸纹丝不动
         val firstOffset = anchor.dayOfWeek.value - 1          // 周一=1 → 偏移 0
         val daysInMonth = anchor.lengthOfMonth()
         repeat(6) { r ->
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
                 repeat(7) { c ->
                     val day = r * 7 + c - firstOffset + 1
                     if (day in 1..daysInMonth) {
@@ -128,12 +133,14 @@ private fun RowScope.DayCell(
     Column(
         modifier = Modifier
             .weight(1f)
+            .fillMaxHeight()
             .padding(1.dp)
             .clip(CircleShape)
             .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
             .then(if (enabled) Modifier.clickable { onSelect() } else Modifier)
             .padding(vertical = 3.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Text(
             text = "$dayNum",
