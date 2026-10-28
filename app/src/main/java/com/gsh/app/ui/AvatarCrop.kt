@@ -122,10 +122,15 @@ fun AvatarCropDialog(
                                 val event = awaitPointerEvent()
                                 val pressed = event.changes.filter { it.pressed }
                                 when {
-                                    // 双指捏合：只缩放，锚点固定在图片中心（放大从中心向外扩），
-                                    // 忽略捏合时手指中心漂移带来的平移干扰
+                                    // 双指捏合：围绕圆框中心缩放——框内取景内容原地放大缩小，
+                                    // 图片中心随缩放按比例远离/靠近框中心，忽略手指中心漂移
                                     pressed.size >= 2 -> {
-                                        scale = (scale * event.calculateZoom()).coerceIn(1f, 6f)
+                                        val newScale = (scale * event.calculateZoom()).coerceIn(1f, 6f)
+                                        val appliedZoom = newScale / scale
+                                        scale = newScale
+                                        offsetX *= appliedZoom
+                                        offsetY *= appliedZoom
+                                        clampOffset()
                                         event.changes.forEach { it.consume() }
                                     }
                                     // 单指拖动：只平移取景
