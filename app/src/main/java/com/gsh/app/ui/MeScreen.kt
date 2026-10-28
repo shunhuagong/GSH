@@ -161,7 +161,7 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
                                 append(health.bmiLevel.label)
                             }
                             append("）")
-                            health.bmr?.let { append(" · 基础代谢约 %.0f kcal/天".format(it)) }
+                            health.bmr?.let { append(" · 基础代谢约\u00A0%.0f\u00A0kcal/天".format(it)) }
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
