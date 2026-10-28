@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gsh.app.data.DateUtils
 import java.time.LocalDate
-import kotlin.math.ceil
 
 /**
  * 自绘月历（替换官方 DatePicker——后者不支持在日期格子里加自定义标记）。
@@ -64,6 +63,7 @@ fun MonthCalendar(
                 text = "${anchor.year}年${anchor.monthValue}月",
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleMedium,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 8.dp)
@@ -88,11 +88,10 @@ fun MonthCalendar(
             }
         }
 
-        // 日期网格
+        // 日期网格：固定 6 行（纸质日历习惯），不足补空行，避免切月时高度跳变
         val firstOffset = anchor.dayOfWeek.value - 1          // 周一=1 → 偏移 0
         val daysInMonth = anchor.lengthOfMonth()
-        val rows = ceil((firstOffset + daysInMonth) / 7.0).toInt()
-        repeat(rows) { r ->
+        repeat(6) { r ->
             Row(modifier = Modifier.fillMaxWidth()) {
                 repeat(7) { c ->
                     val day = r * 7 + c - firstOffset + 1
