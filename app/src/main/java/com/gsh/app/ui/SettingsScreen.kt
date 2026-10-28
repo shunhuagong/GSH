@@ -412,8 +412,11 @@ fun SettingsScreen(vm: GshViewModel) {
     }
 }
 
-private fun trimNum(value: Double): String =
-    if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
+/** 整数不带小数点；小数先四舍五入到两位，去掉 Float 存储带来的精度尾巴（如 0.8 读回 0.800000011…）。 */
+private fun trimNum(value: Double): String {
+    val rounded = Math.round(value * 100) / 100.0
+    return if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString() else rounded.toString()
+}
 
 /** 用系统分享面板发出导出文件。 */
 private fun shareFile(context: Context, file: File, mime: String) {
