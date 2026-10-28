@@ -3,6 +3,7 @@ package com.gsh.app.ui
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -94,27 +96,47 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
                 .padding(start = 16.dp, end = 4.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // 头像：相册选的（点击更换）；未设置时用启动插画作默认头像
+            // 头像本体仅展示；更换头像的唯一入口是右下角 + 角标
             Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(CircleShape)
-                    .clickable { launchers.pickFromGallery() },
+                modifier = Modifier.size(96.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (avatarPhoto != null) {
-                    AsyncImage(
-                        model = vm.photoFile(avatarPhoto),
-                        contentDescription = "头像",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Image(
-                        painter = painterResource(R.drawable.splash_illustration),
-                        contentDescription = "默认头像",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                ) {
+                    if (avatarPhoto != null) {
+                        AsyncImage(
+                            model = vm.photoFile(avatarPhoto),
+                            contentDescription = "头像",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(R.drawable.splash_illustration),
+                            contentDescription = "默认头像",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                        .clickable { launchers.pickFromGallery() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = "更换头像",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -124,7 +146,7 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
             }
         }
         Text(
-            "点击头像可更换",
+            "点击 + 更换头像",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 16.dp, top = 4.dp)
