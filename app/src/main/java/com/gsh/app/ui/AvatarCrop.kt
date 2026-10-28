@@ -118,16 +118,18 @@ fun AvatarCropDialog(
                     .pointerInput(bmp) {
                         awaitEachGesture {
                             awaitFirstDown(requireUnconsumed = false)
+                            // 本次手势内一旦发生明显捏合即锁定为"缩放会话"，
+                            // 之后全程忽略平移——杜绝捏合起止阶段手指中心移动带偏图片
+                            var zooming = false
                             do {
                                 val event = awaitPointerEvent()
                                 val pressed = event.changes.filter { it.pressed }
                                 when {
-                                    // 双指：间距变化 = 捏合缩放（图片中心锚定，放大从图片中心向外扩）；
-                                    // 间距基本不变 = 双指平移（图片跟手）；捏合中的中心漂移噪声忽略
                                     pressed.size >= 2 -> {
                                         val zoom = event.calculateZoom()
+                                        if (zoom < 0.98f || zoom > 1.02f) zooming = true
                                         scale = (scale * zoom).coerceIn(1f, 6f)
-                                        if (zoom > 0.995f && zoom < 1.005f) {
+                                        if (!zooming) {
                                             val pan = event.calculatePan()
                                             offsetX += pan.x
                                             offsetY += pan.y
