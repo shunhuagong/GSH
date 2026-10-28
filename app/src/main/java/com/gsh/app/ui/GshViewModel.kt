@@ -36,15 +36,18 @@ import java.io.File
 @OptIn(ExperimentalCoroutinesApi::class)
 class GshViewModel(private val repo: GshRepository) : ViewModel() {
 
-    /** 近30天成绩：饮食打卡天数、蛋白达标天数、明确标记的训练日天数。 */
+    /** 近30天成绩：打卡/达标以有饮食记录的天计；训练日、休息日直接累加账本记录（启动时自动补账保证每天都有字）。 */
     data class Last30Stats(
         val loggedDays: Int,
         val proteinHitDays: Int,
-        val trainingDays: Int
+        val trainingDays: Int,
+        val restDays: Int
     )
 
     init {
         viewModelScope.launch { repo.seedFoods() }
+        // 近30天没记录的天按默认训练日补账，之后统计可直接累加
+        viewModelScope.launch { repo.backfillDayTypes(30) }
     }
 
     // ---------- 今日/所选日期 ----------
@@ -145,19 +148,25 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         viewModelScope.launch { repo.setDayType(date, isTraining) }
     }
 
-    /** 近30天成绩：打卡/达标以有饮食记录的天计；训练日沿用全局口径（未标记即训练日，只扣明确标记的休息日）。 */
+    /** 近30天成绩：训练日/休息日直接累加账本记录（选到谁就加谁）。 */
     val last30Stats: StateFlow<Last30Stats> =
         combine(dailyTotals, dayTypes, profile) { totals, types, p ->
             val start = DateUtils.format(DateUtils.parse(DateUtils.today()).minusDays(29))
             val recent = totals.filter { it.date >= start }
             val proteinTarget = p.weightKg * p.proteinPerKg
             val proteinHits = recent.count { it.protein >= proteinTarget }
-            val restDays = types.entries.count { (d, isTraining) -> !isTraining && d >= start }
-            Last30Stats(recent.size, proteinHits, 30 - restDays)
+            var trainingDays = 0
+            var restDays = 0
+            types.entries.forEach { (d, isTraining) ->
+                if (d >= start) {
+                    if (isTraining) trainingDays++ else restDays++
+                }
+            }
+            Last30Stats(recent.size, proteinHits, trainingDays, restDays)
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5_000),
-            Last30Stats(0, 0, 0)
+            Last30Stats(0, 0, 0, 0)
         )
 
     // ---------- 食物搜索 ----------

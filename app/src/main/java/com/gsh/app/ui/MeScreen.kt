@@ -163,6 +163,7 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
             StatBlock("饮食打卡", "${stats.loggedDays} 天", Modifier.weight(1f))
             StatBlock("蛋白达标", "${stats.proteinHitDays} 天", Modifier.weight(1f))
             StatBlock("训练日", "${stats.trainingDays} 天", Modifier.weight(1f))
+            StatBlock("休息日", "${stats.restDays} 天", Modifier.weight(1f))
         }
 
         // 体重：当前值、较上次变化、近90天折线

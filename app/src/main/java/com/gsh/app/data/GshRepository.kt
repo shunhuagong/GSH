@@ -38,6 +38,20 @@ class GshRepository(context: Context) {
         dayTypeDao.upsert(DayType(date, isTraining))
     }
 
+    /**
+     * 补账：把近 days 天里账本上没记录的天按默认（训练日）写入，
+     * 之后训练日/休息日统计可直接累加账本，无需倒推。
+     */
+    suspend fun backfillDayTypes(days: Int) {
+        val today = java.time.LocalDate.now()
+        for (offset in 0 until days) {
+            val date = DateUtils.format(today.minusDays(offset.toLong()))
+            if (dayTypeDao.byDate(date) == null) {
+                dayTypeDao.upsert(DayType(date, true))
+            }
+        }
+    }
+
     /** 记录体重（当天重复记则覆盖），并同步更新设置里的体重，营养目标随之变化。 */
     suspend fun recordWeight(date: String, weightKg: Double) {
         weightLogDao.upsert(WeightLog(date, weightKg, System.currentTimeMillis()))
