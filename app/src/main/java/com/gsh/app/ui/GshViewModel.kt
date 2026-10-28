@@ -55,11 +55,27 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
     /** 上次活跃日期：应用跨天回到前台时自动定位到新的一天。 */
     private var lastActiveDate: String = DateUtils.today()
 
+    /** 当天已自动记账（写默认训练日）的日期，进程内去重。 */
+    private var autoLoggedDate: String? = null
+
     fun refreshIfNewDay() {
         val today = DateUtils.today()
         if (today != lastActiveDate) {
             lastActiveDate = today
             _selectedDate.value = today
+        }
+        // 每天首次使用自动把当天日类型落库：账本显式化，训练日/休息日之后可直接统计
+        logTodayDayType(today)
+    }
+
+    /** 账本上没有当天记录时写入默认（训练日）；已标记过的（含休息日）不动。 */
+    private fun logTodayDayType(date: String) {
+        if (autoLoggedDate == date) return
+        autoLoggedDate = date
+        viewModelScope.launch {
+            if (repo.dayTypeDao.byDate(date) == null) {
+                repo.setDayType(date, true)
+            }
         }
     }
 

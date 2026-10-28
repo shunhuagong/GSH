@@ -23,6 +23,9 @@ interface DayTypeDao {
     @Query("SELECT * FROM day_types WHERE date = :date")
     fun observeByDate(date: String): Flow<DayType?>
 
+    @Query("SELECT * FROM day_types WHERE date = :date")
+    suspend fun byDate(date: String): DayType?
+
     @Query("SELECT * FROM day_types")
     fun observeAll(): Flow<List<DayType>>
 
