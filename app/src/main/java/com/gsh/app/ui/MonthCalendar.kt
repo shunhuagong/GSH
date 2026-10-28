@@ -112,8 +112,8 @@ fun MonthCalendar(
                             isToday = isToday,
                             isSelected = dateStr == selectedDate,
                             enabled = allowFuture || dateStr <= today,
-                            // 今天还没过完，不显示训练/休息标记
-                            mark = if (isToday) null else markOf(dateStr),
+                            // 今天由 DayCell 显示「今」标记，不显示训练/休息小图标
+                            mark = markOf(dateStr),
                             onSelect = {
                                 Log.d(TAG, "tap $dateStr")
                                 onSelectDate(dateStr)
@@ -161,11 +161,22 @@ private fun RowScope.DayCell(
                 else -> MaterialTheme.colorScheme.onSurface
             }
         )
-        // 小标记占位行：无标记时用同字号空串，保证每行等高
+        // 标记行：今天显示主色「今」，其余显示训练/休息小图标；无标记时占位空串保证每行等高
+        val markText = when {
+            isToday -> "今"
+            mark != null -> mark
+            else -> " "
+        }
         Text(
-            text = mark ?: " ",
+            text = markText,
             fontSize = 10.sp,
-            lineHeight = 12.sp
+            lineHeight = 12.sp,
+            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+            color = when {
+                isToday && isSelected -> MaterialTheme.colorScheme.onPrimary
+                isToday -> MaterialTheme.colorScheme.primary
+                else -> Color.Unspecified
+            }
         )
     }
 }
