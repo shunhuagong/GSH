@@ -175,6 +175,9 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
                     if (d in loggedDates) {
                         if (dayTypes[d] ?: true) "💪" else "😴"
                     } else null
+                },
+                onToggleDayType = { d ->
+                    vm.setDayType(d, !(dayTypes[d] ?: true))
                 }
             )
         }
@@ -238,7 +241,13 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
 }
 
 @Composable
-private fun DateHeader(date: String, onChange: (String) -> Unit, streak: Int, markOf: (String) -> String?) {
+private fun DateHeader(
+    date: String,
+    onChange: (String) -> Unit,
+    streak: Int,
+    markOf: (String) -> String?,
+    onToggleDayType: (String) -> Unit
+) {
     var showPicker by remember { mutableStateOf(false) }
 
     if (showPicker) {
@@ -261,7 +270,8 @@ private fun DateHeader(date: String, onChange: (String) -> Unit, streak: Int, ma
                         }
                     },
                     allowFuture = true,
-                    markOf = markOf
+                    markOf = markOf,
+                    onToggleDayType = onToggleDayType
                 )
             }
         }

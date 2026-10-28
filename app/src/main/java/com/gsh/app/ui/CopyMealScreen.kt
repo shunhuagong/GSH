@@ -74,6 +74,9 @@ fun CopyMealScreen(vm: GshViewModel, onDone: () -> Unit) {
                     if (date in loggedDates) {
                         if (dayTypes[date] ?: true) "💪" else "😴"
                     } else null
+                },
+                onToggleDayType = { date ->
+                    vm.setDayType(date, !(dayTypes[date] ?: true))
                 }
             )
             Spacer(Modifier.height(12.dp))
