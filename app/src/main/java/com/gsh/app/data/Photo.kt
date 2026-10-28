@@ -9,23 +9,25 @@ import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 打卡照片，分两类：
+ * 打卡照片，分三类：
  * - 餐次照片（KIND_MEAL）：挂在某天的某个餐次上，随打卡展示；
- * - 体型照片（KIND_BODY）：按日期进「变化」页时间线。
+ * - 体型照片（KIND_BODY）：按日期进「变化」页时间线；
+ * - 头像（KIND_AVATAR）：「我」页用户头像，只保留最新一张。
  * path 存相对应用私有目录（filesDir）的路径，图片文件由仓库层负责写入与清理。
  */
 @Entity(tableName = "photos", indices = [Index("date")])
 data class Photo(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val kind: Int,       // KIND_MEAL / KIND_BODY
+    val kind: Int,       // KIND_MEAL / KIND_BODY / KIND_AVATAR
     val date: String,    // yyyy-MM-dd
-    val mealType: Int,   // 餐次（MealEntry.MEAL_*）；体型照片无餐次用 MEAL_NONE
+    val mealType: Int,   // 餐次（MealEntry.MEAL_*）；体型照片/头像无餐次用 MEAL_NONE
     val path: String,
     val createdAt: Long
 ) {
     companion object {
         const val KIND_MEAL = 0
         const val KIND_BODY = 1
+        const val KIND_AVATAR = 2
         const val MEAL_NONE = -1
     }
 }
@@ -40,6 +42,10 @@ interface PhotoDao {
     /** 全部体型照片，新的日期在前，同一天按先后 */
     @Query("SELECT * FROM photos WHERE kind = 1 ORDER BY date DESC, id ASC")
     fun observeBodyPhotos(): Flow<List<Photo>>
+
+    /** 当前头像（只保留最新一张） */
+    @Query("SELECT * FROM photos WHERE kind = 2 ORDER BY id DESC LIMIT 1")
+    fun observeAvatar(): Flow<Photo?>
 
     @Insert
     suspend fun insert(photo: Photo): Long

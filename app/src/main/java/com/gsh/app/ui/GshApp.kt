@@ -161,8 +161,7 @@ fun GshApp(vm: GshViewModel = viewModel(factory = GshViewModel.Factory)) {
                 composable("me") {
                     MeScreen(
                         vm = vm,
-                        onOpenSettings = { navController.navigate("settings") },
-                        onOpenBody = { navigateToTab("body") }
+                        onOpenSettings = { navController.navigate("settings") }
                     )
                 }
                 // 设置改为「我」页进入的二级页（不显示底部导航）

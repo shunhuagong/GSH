@@ -1,7 +1,9 @@
 package com.gsh.app.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,47 +13,49 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import androidx.compose.ui.layout.ContentScale
+import com.gsh.app.R
 import com.gsh.app.data.BmiLevel
 import com.gsh.app.data.Gender
 import com.gsh.app.data.HealthMetrics
+import com.gsh.app.data.Photo
 
 /**
  * 「我」页：个人信息与健康指标的展示位。
- * 头像取最新体型照片（点击进「变化」页）；编辑入口在右上角齿轮 → 设置。
+ * 头像默认用启动插画，点击从相册选图更换；编辑入口在右上角齿轮 → 设置。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit, onOpenBody: () -> Unit) {
+fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
     val profile by vm.profile.collectAsState()
     val streak by vm.streak.collectAsState()
-    val bodyPhotos by vm.bodyPhotos.collectAsState()
-    val latestBodyPhoto = bodyPhotos.firstOrNull()
+    val avatarPhoto: Photo? = vm.avatar.collectAsState().value
     val health = HealthMetrics.from(profile)
+
+    val launchers = rememberPhotoLaunchers { uri, _ ->
+        uri?.let(vm::changeAvatar)
+    }
 
     val genderLabel = when (profile.gender) {
         Gender.MALE -> "男"
@@ -65,52 +69,51 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit, onOpenBody: () -> Uni
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
     ) {
-        TopAppBar(
-            title = { Text("我") },
-            actions = {
-                IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Outlined.Settings, contentDescription = "设置")
-                }
+        // 右上角齿轮进设置
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            IconButton(onClick = onOpenSettings) {
+                Icon(Icons.Outlined.Settings, contentDescription = "设置")
             }
-        )
+        }
 
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            Spacer(Modifier.height(8.dp))
-
-            // 头像：最新体型照，点击进「变化」页；无照片用占位图标
+            // 头像：相册选的（点击更换）；未设置时用启动插画作默认头像
             Box(
                 modifier = Modifier
                     .size(96.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { onOpenBody() },
+                    .clickable { launchers.pickFromGallery() },
                 contentAlignment = Alignment.Center
             ) {
-                if (latestBodyPhoto != null) {
+                if (avatarPhoto != null) {
                     AsyncImage(
-                        model = vm.photoFile(latestBodyPhoto),
-                        contentDescription = "最新体型照",
+                        model = vm.photoFile(avatarPhoto),
+                        contentDescription = "头像",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Icon(
-                        Icons.Outlined.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    Image(
+                        painter = painterResource(R.drawable.splash_illustration),
+                        contentDescription = "默认头像",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
-            if (latestBodyPhoto == null) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "拍一张体型照，作为你的头像",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "点击头像可更换",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
             Spacer(Modifier.height(16.dp))
 

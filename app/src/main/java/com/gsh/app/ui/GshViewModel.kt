@@ -240,6 +240,21 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         repo.photoDao.observeBodyPhotos()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** 「我」页头像（相册选择，只保留最新一张；null = 使用默认头像） */
+    val avatar: StateFlow<Photo?> =
+        repo.photoDao.observeAvatar()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** 从相册换头像：保存成功后清理旧文件。 */
+    fun changeAvatar(uri: Uri) {
+        viewModelScope.launch {
+            val old = avatar.value
+            if (repo.savePhoto(uri, Photo.KIND_AVATAR, DateUtils.today(), Photo.MEAL_NONE)) {
+                old?.let { repo.deletePhoto(it) }
+            }
+        }
+    }
+
     fun photoFile(photo: Photo): File = repo.photoFile(photo)
 
     /** 保存餐次照片；tempFile 为拍照临时文件，导入完成后清理。 */

@@ -44,7 +44,7 @@ com.gsh.app
 ├── ai/AiAdvisor          # OpenAI 兼容客户端（OkHttp + org.json），单日分析 + 近7天周报 prompt
 └── data/
     ├── Food / MealEntry  # 实体；MealEntry 存营养快照（历史不受食物库修改影响）
-    ├── Photo / PhotoDao   # 打卡照片（kind：0 餐次 / 1 体型；path 指 filesDir/photos 私有文件）
+    ├── Photo / PhotoDao   # 打卡照片（kind：0 餐次 / 1 体型 / 2 头像；path 指 filesDir/photos 私有文件）
     ├── AppDatabase       # version 4；注意：fallbackToDestructiveMigration 仍在（有数据风险，待移除）
     ├── SeedFoods         # 预置食物库（口径：USDA + 中国食物成分表）
     ├── GshRepository     # 唯一数据入口；seedFoods() 三同步：补插缺失/清理多余/数值修订；照片采样+EXIF 旋转矫正压到 1600px 存 filesDir/photos
@@ -57,7 +57,7 @@ ui/
 ├── Photos                # 拍照/相册选图启动器（免权限方案）+ 全屏大图查看器 + 缩略图
 ├── CopyMealScreen        # 全屏月历复制页（只能从历史拉到今天）
 ├── AddEntryScreen / FoodLibraryScreen / HistoryScreen / SettingsScreen
-├── MeScreen              # 「我」页：最新体型照头像（点击进「变化」）+ 个人信息卡（体重/性别/身高/年龄/🔥打卡）+ 健康指标卡（BMI/BMR，点击进设置）；设置仅从「我」页右上角齿轮进入（二级页，无底部导航）
+├── MeScreen              # 「我」页：无标题字，右上角齿轮进设置（二级页）；头像默认用启动插画、点击从相册选图更换（Photo kind=2，仅留最新一张）+ 个人信息卡（体重/性别/身高/年龄/🔥打卡）+ 健康指标卡（BMI/BMR，点击进设置）
 └── ConfettiOverlay / AiAnalysisSheet / Theme（含 ProteinColor/CarbsColor/FatColor 固定色）
 ```
 
@@ -101,6 +101,6 @@ ui/
 | v1.6 (code 7) | 拍照打卡：餐次 📷 照片（拍照/相册）；新增「变化」tab（体型照片时间线）；查看器左右滑动切换、连续删除（删一张自动停下一张，caption 显示第 n/m 张）；Room v3→v4（photos 表，显式迁移）；引入 Coil（加载）+ ExifInterface（旋转矫正） |
 | v1.7 (code 8) | 启动页：即梦 AI 生成插画（用户自有素材，构图裁剪去除占位文字条与角标，仅个人自用）+ GSH 字样；约 1 秒淡出、点击跳过、回前台不重播；windowBackground 同步奶油色防闪白 |
 | v1.8 (code 9) | 设置页身体信息扩展：性别/身高/年龄（选填；年龄输入、内部按出生年存储自动增长）；健康指标卡片（BMI 中国标准分级 + 健康体重范围 + Mifflin-St Jeor 基础代谢）；AI prompt 与 JSON 导出带上身体信息；修复系数显示浮点精度尾巴（0.8 读回 0.800000011…） |
-| v1.9 (code 10) | 新增「我」页（原设置 tab 改造）：最新体型照圆形头像（点击进「变化」）+ 个人信息卡（体重大字、性别/身高/年龄、🔥连续打卡）+ 健康指标卡；设置改为「我」页右上角齿轮进入的二级页（带返回箭头），健康指标卡从设置页移至「我」页展示 |
+| v1.9 (code 10) | 新增「我」页（原设置 tab 改造）：默认插画头像、点击从相册选图更换（kind=2 只留最新一张）+ 个人信息卡（体重大字、性别/身高/年龄、🔥连续打卡）+ 健康指标卡；设置改为「我」页右上角齿轮进入的二级页（带返回箭头），健康指标卡从设置页移至「我」页展示 |
 
 （2026-10-16 之后的功能改动请追加到本表）
