@@ -242,6 +242,8 @@ private fun DateHeader(date: String, onChange: (String) -> Unit, streak: Int, ma
     var showPicker by remember { mutableStateOf(false) }
 
     if (showPicker) {
+        // 两段式：第一下仅选中，再点同一天才确认跳转；关闭弹窗后选中自动重置
+        var pickedDate by remember(showPicker) { mutableStateOf<String?>(null) }
         Dialog(onDismissRequest = { showPicker = false }) {
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,
@@ -249,11 +251,14 @@ private fun DateHeader(date: String, onChange: (String) -> Unit, streak: Int, ma
                 modifier = Modifier.padding(8.dp)
             ) {
                 MonthCalendar(
-                    selectedDate = date,
-                    onSelectDate = {
-                        // 先关弹窗再切日期，避免日期变化引发的重组干扰弹窗移除
-                        showPicker = false
-                        onChange(it)
+                    selectedDate = pickedDate ?: date,
+                    onSelectDate = { clicked ->
+                        if (pickedDate == clicked) {
+                            showPicker = false
+                            onChange(clicked)
+                        } else {
+                            pickedDate = clicked
+                        }
                     },
                     allowFuture = true,
                     markOf = markOf
