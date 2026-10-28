@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -66,9 +67,11 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
             .fillMaxSize()
             .statusBarsPadding()
     ) {
+        // 挖孔屏的系统状态栏 inset 比可见状态栏高，行整体上移贴近可见顶部
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .offset(y = (-16).dp)
                 .padding(start = 16.dp, end = 4.dp),
             verticalAlignment = Alignment.Top
         ) {
