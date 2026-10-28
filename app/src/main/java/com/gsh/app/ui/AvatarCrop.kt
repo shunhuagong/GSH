@@ -251,5 +251,15 @@ private fun decodeForCrop(resolver: ContentResolver, uri: Uri): Bitmap? {
             bitmap = rotated
         }
     }
+
+    // 透明底图（如 PNG 贴图/表情）在黑底裁剪界面会显示成黑块，铺白底所见即所得
+    if (bitmap.hasAlpha()) {
+        val solid = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(solid)
+        canvas.drawColor(android.graphics.Color.WHITE)
+        canvas.drawBitmap(bitmap, 0f, 0f, null)
+        bitmap.recycle()
+        bitmap = solid
+    }
     return bitmap
 }
