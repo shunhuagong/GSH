@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +21,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,8 +42,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.gsh.app.data.AiConfig
+import com.gsh.app.data.BmiLevel
+import com.gsh.app.data.Gender
+import com.gsh.app.data.HealthMetrics
 import com.gsh.app.data.UserProfile
 import java.io.File
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +56,13 @@ fun SettingsScreen(vm: GshViewModel) {
     val aiConfig by vm.aiConfig.collectAsState()
 
     var weight by remember(profile) { mutableStateOf(trimNum(profile.weightKg)) }
+    var height by remember(profile) {
+        mutableStateOf(if (profile.heightCm > 0) trimNum(profile.heightCm) else "")
+    }
+    var birthYear by remember(profile) {
+        mutableStateOf(if (profile.birthYear > 0) profile.birthYear.toString() else "")
+    }
+    var gender by remember(profile) { mutableStateOf(profile.gender) }
     var protein by remember(profile) { mutableStateOf(trimNum(profile.proteinPerKg)) }
     var carbsTraining by remember(profile) { mutableStateOf(trimNum(profile.carbsTrainingPerKg)) }
     var carbsRest by remember(profile) { mutableStateOf(trimNum(profile.carbsRestPerKg)) }
@@ -72,12 +87,28 @@ fun SettingsScreen(vm: GshViewModel) {
     }
 
     val w = weight.toDoubleOrNull()
+    val h = height.toDoubleOrNull()
+    val by = birthYear.toIntOrNull()
     val p = protein.toDoubleOrNull()
     val ct = carbsTraining.toDoubleOrNull()
     val cr = carbsRest.toDoubleOrNull()
     val f = fat.toDoubleOrNull()
+    // 身高 / 出生年为选填：留空视为未填写，填了则必须在合理范围
+    val heightFilled = h != null && h in 50.0..280.0
+    val heightValid = height.isBlank() || heightFilled
+    val birthYearValid = birthYear.isBlank() || (by != null && by in 1900..LocalDate.now().year)
     val valid = w != null && w > 0 && p != null && p > 0 &&
-        ct != null && ct > 0 && cr != null && cr > 0 && f != null && f >= 0
+        ct != null && ct > 0 && cr != null && cr > 0 && f != null && f >= 0 &&
+        heightValid && birthYearValid
+
+    // 根据当前输入实时计算健康指标（BMI / 分级 / 基础代谢）
+    val health = if (w != null && w > 0 && heightFilled) {
+        HealthMetrics.from(
+            UserProfile(
+                weightKg = w, heightCm = h!!, gender = gender, birthYear = by ?: 0
+            )
+        )
+    } else null
 
     // 根据当前输入实时计算两套目标
     val tProtein = if (w != null && p != null) w * p else 0.0
@@ -124,6 +155,92 @@ fun SettingsScreen(vm: GshViewModel) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+            Spacer(Modifier.height(8.dp))
+            Text("性别")
+            Spacer(Modifier.height(4.dp))
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = gender == Gender.MALE,
+                    onClick = { gender = Gender.MALE },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                ) { Text("男") }
+                SegmentedButton(
+                    selected = gender == Gender.FEMALE,
+                    onClick = { gender = Gender.FEMALE },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                ) { Text("女") }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = height,
+                    onValueChange = { height = it },
+                    label = { Text("身高") },
+                    suffix = { Text("cm") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = birthYear,
+                    onValueChange = { birthYear = it },
+                    label = { Text("出生年份") },
+                    suffix = { Text("年") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (health != null) {
+                Spacer(Modifier.height(8.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "BMI %.1f".format(health.bmi),
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                health.bmiLevel.label,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = when (health.bmiLevel) {
+                                    BmiLevel.HEALTHY -> CarbsColor
+                                    BmiLevel.UNDERWEIGHT, BmiLevel.OVERWEIGHT -> FatColor
+                                    BmiLevel.OBESE -> MaterialTheme.colorScheme.error
+                                }
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "该身高的健康体重范围：%.1f ~ %.1f kg"
+                                .format(health.healthyWeightRange.start, health.healthyWeightRange.endInclusive),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (health.bmr != null) {
+                            Text(
+                                "基础代谢约 %.0f kcal/天（Mifflin-St Jeor 公式）"
+                                    .format(health.bmr),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Text(
+                                "填写性别与出生年份后可查看基础代谢",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            "增肌期肌肉量大，BMI 偏高属正常，仅供参考",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
 
             Spacer(Modifier.height(16.dp))
             Text("增肌营养系数", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -197,7 +314,16 @@ fun SettingsScreen(vm: GshViewModel) {
 
             Spacer(Modifier.height(16.dp))
             Button(
-                onClick = { vm.updateProfile(UserProfile(w!!, p!!, ct!!, cr!!, f!!)) },
+                onClick = {
+                    vm.updateProfile(
+                        UserProfile(
+                            weightKg = w!!, heightCm = if (heightFilled) h!! else 0.0,
+                            gender = gender, birthYear = by ?: 0,
+                            proteinPerKg = p!!, carbsTrainingPerKg = ct!!,
+                            carbsRestPerKg = cr!!, fatPerKg = f!!
+                        )
+                    )
+                },
                 enabled = valid,
                 modifier = Modifier.fillMaxWidth()
             ) {

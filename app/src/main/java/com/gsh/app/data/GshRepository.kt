@@ -229,6 +229,9 @@ class GshRepository(context: Context) {
             put("exportedAt", LocalDateTime.now().toString())
             put("profile", JSONObject().apply {
                 put("weightKg", profile.weightKg)
+                put("heightCm", profile.heightCm)
+                profile.gender?.let { put("gender", it.name) }
+                put("birthYear", profile.birthYear)
                 put("proteinPerKg", profile.proteinPerKg)
                 put("carbsTrainingPerKg", profile.carbsTrainingPerKg)
                 put("carbsRestPerKg", profile.carbsRestPerKg)

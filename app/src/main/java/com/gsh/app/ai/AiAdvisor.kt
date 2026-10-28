@@ -3,6 +3,8 @@ package com.gsh.app.ai
 import com.gsh.app.data.AiConfig
 import com.gsh.app.data.DailyTotal
 import com.gsh.app.data.DateUtils
+import com.gsh.app.data.Gender
+import com.gsh.app.data.HealthMetrics
 import com.gsh.app.data.MealEntry
 import com.gsh.app.data.NutritionTargets
 import com.gsh.app.data.UserProfile
@@ -31,7 +33,7 @@ class AiException(message: String) : Exception(message)
 
 /**
  * AI 饮食分析：调用 OpenAI 兼容接口（默认智谱 BigModel，可切换 DeepSeek 等）。
- * 上行内容仅包含当日/近7天的营养数据与体重，不包含其他个人信息。
+ * 上行内容仅包含当日/近7天的营养数据与设置页填写的身体信息，不包含其他个人信息。
  */
 class AiAdvisor {
 
@@ -62,7 +64,7 @@ class AiAdvisor {
         val user = """
             请分析我${DateUtils.display(date)}的饮食并给出建议。
 
-            体重：${fmt(profile.weightKg)} kg
+            身体情况：${bodyInfo(profile)}
             今天是：$dayType
             今日目标：蛋白质 ${fmt(targets.protein)}g、碳水 ${fmt(targets.carbs)}g、脂肪 ${fmt(targets.fat)}g（约 ${fmt(targets.calories)} kcal）
             实际摄入：蛋白质 ${fmt1(protein)}g、碳水 ${fmt1(carbs)}g、脂肪 ${fmt1(fat)}g（约 ${fmt(protein * 4 + carbs * 4 + fat * 9)} kcal）
@@ -108,7 +110,7 @@ class AiAdvisor {
         val user = """
             请根据我近7天的饮食数据写一份简短周报。
 
-            体重：${fmt(profile.weightKg)} kg
+            身体情况：${bodyInfo(profile)}
             每日目标：训练日 蛋白 ${fmt(training.protein)}g、碳水 ${fmt(training.carbs)}g、脂肪 ${fmt(training.fat)}g；休息日 蛋白 ${fmt(rest.protein)}g、碳水 ${fmt(rest.carbs)}g、脂肪 ${fmt(rest.fat)}g
 
             近7天数据：
@@ -119,6 +121,20 @@ class AiAdvisor {
         """.trimIndent()
 
         return chat(config, user)
+    }
+
+    /** 拼接身体情况一行，仅带上已填写的信息（体重/身高/BMI/性别/年龄/基础代谢）。 */
+    private fun bodyInfo(profile: UserProfile): String = buildString {
+        append("体重 ").append(fmt(profile.weightKg)).append("kg")
+        if (profile.heightCm > 0) {
+            append("、身高 ").append(fmt(profile.heightCm)).append("cm")
+            HealthMetrics.from(profile)?.let { m ->
+                append("、BMI ").append(fmt1(m.bmi)).append("（").append(m.bmiLevel.label).append("）")
+                m.bmr?.let { append("、基础代谢约 ").append(fmt(it)).append("kcal/天") }
+            }
+        }
+        profile.gender?.let { append("、性别 ").append(if (it == Gender.MALE) "男" else "女") }
+        profile.age()?.let { append("、").append(it).append(" 岁") }
     }
 
     /** 调用 OpenAI 兼容 /chat/completions，返回模型回复文本。 */
