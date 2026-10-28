@@ -11,11 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -23,7 +21,6 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,28 +32,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.gsh.app.R
-import com.gsh.app.data.BmiLevel
-import com.gsh.app.data.Gender
-import com.gsh.app.data.HealthMetrics
 import com.gsh.app.data.Photo
 
 /**
- * 「我」页：头像 + 右侧身体信息小字（底部并齐），齿轮进设置编辑。
+ * 「我」页：极简——头像与右上角齿轮进设置。
  * 头像默认用启动插画，右下角 + 角标从相册选图更换。
  */
 @Composable
 fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
-    val profile by vm.profile.collectAsState()
-    val streak by vm.streak.collectAsState()
     val avatarPhoto: Photo? = vm.avatar.collectAsState().value
-    val health = HealthMetrics.from(profile)
 
     // 选完图先弹裁剪界面：缩放/拖动确认后才保存
     var cropUri by remember { mutableStateOf<Uri?>(null) }
@@ -73,15 +60,6 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
             onDismiss = { cropUri = null }
         )
     }
-
-    val genderLabel = when (profile.gender) {
-        Gender.MALE -> "男"
-        Gender.FEMALE -> "女"
-        null -> null
-    }
-    val heightLabel = if (profile.heightCm > 0) "${trimNum(profile.heightCm)} cm" else null
-    val ageLabel = profile.age()?.let { "$it 岁" }
-    val infoLine = listOfNotNull(genderLabel, heightLabel, ageLabel).joinToString(" · ")
 
     Column(
         modifier = Modifier
@@ -138,71 +116,10 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
                     )
                 }
             }
-
-            Spacer(Modifier.width(12.dp))
-
-            // 身体信息小字，整体与头像底部并齐
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .align(Alignment.Bottom)
-            ) {
-                val info = buildString {
-                    append(trimNum(profile.weightKg)).append(" kg")
-                    if (infoLine.isNotEmpty()) append(" · ").append(infoLine)
-                }
-                Text(info, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(3.dp))
-                if (health != null) {
-                    Text(
-                        buildAnnotatedString {
-                            append("BMI %.1f（".format(health.bmi))
-                            withStyle(SpanStyle(color = bmiColor(health.bmiLevel), fontWeight = FontWeight.Bold)) {
-                                append(health.bmiLevel.label)
-                            }
-                            append("）")
-                            health.bmr?.let { append(" · 基础代谢约\u00A0%.0f\u00A0kcal/天".format(it)) }
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    Text(
-                        "去设置填写身高，可查看 BMI 与基础代谢",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.clickable { onOpenSettings() }
-                    )
-                }
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "🔥 连续打卡 $streak 天",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            IconButton(
-                onClick = onOpenSettings,
-                modifier = Modifier.align(Alignment.Top)
-            ) {
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onOpenSettings) {
                 Icon(Icons.Outlined.Settings, contentDescription = "设置")
             }
         }
-        Text(
-            "点击 + 更换头像",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-        )
     }
-}
-
-/** BMI 分级配色：健康绿 / 偏瘦、超重橙 / 肥胖红，与设置页口径一致。 */
-@Composable
-private fun bmiColor(level: BmiLevel) = when (level) {
-    BmiLevel.HEALTHY -> CarbsColor
-    BmiLevel.UNDERWEIGHT, BmiLevel.OVERWEIGHT -> FatColor
-    BmiLevel.OBESE -> MaterialTheme.colorScheme.error
 }
