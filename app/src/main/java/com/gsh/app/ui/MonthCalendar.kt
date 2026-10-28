@@ -1,5 +1,6 @@
 package com.gsh.app.ui
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gsh.app.data.DateUtils
 import java.time.LocalDate
+
+private const val TAG = "MonthCal"
 
 /**
  * 自绘月历（替换官方 DatePicker——后者不支持在日期格子里加自定义标记）。
@@ -102,14 +105,19 @@ fun MonthCalendar(
                     val day = r * 7 + c - firstOffset + 1
                     if (day in 1..daysInMonth) {
                         val dateStr = DateUtils.format(anchor.withDayOfMonth(day))
+                        val isToday = dateStr == today
                         DayCell(
                             date = dateStr,
                             dayNum = day,
-                            isToday = dateStr == today,
+                            isToday = isToday,
                             isSelected = dateStr == selectedDate,
                             enabled = allowFuture || dateStr <= today,
-                            mark = markOf(dateStr),
-                            onSelect = { onSelectDate(dateStr) }
+                            // 今天还没过完，不显示训练/休息标记
+                            mark = if (isToday) null else markOf(dateStr),
+                            onSelect = {
+                                Log.d(TAG, "tap $dateStr")
+                                onSelectDate(dateStr)
+                            }
                         )
                     } else {
                         Spacer(modifier = Modifier.weight(1f))
