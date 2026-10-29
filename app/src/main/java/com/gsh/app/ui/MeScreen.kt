@@ -63,7 +63,7 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit, onOpenWorkout: () -> 
     val stats by vm.last30Stats.collectAsState()
     val profile by vm.profile.collectAsState()
     val weightLogs by vm.weightLogs.collectAsState()
-    val latestWorkout by vm.latestWorkout.collectAsState()
+    val latestWorkout by vm.latestTraining.collectAsState()
 
     var showWeightDialog by remember { mutableStateOf(false) }
     var weightInput by remember { mutableStateOf("") }
@@ -294,8 +294,8 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit, onOpenWorkout: () -> 
                 Spacer(Modifier.height(4.dp))
                 Text(
                     latestWorkout?.let { w ->
-                        "最近：%s · %d 分钟 · %d 个动作 %d 组".format(
-                            DateUtils.display(w.date), w.durationMin, w.exerciseCount, w.setCount
+                        "最近：%s · %d 个动作 %d 条".format(
+                            DateUtils.display(w.date), w.exerciseCount, w.entryCount
                         )
                     } ?: "还没有训练记录",
                     style = MaterialTheme.typography.bodySmall,

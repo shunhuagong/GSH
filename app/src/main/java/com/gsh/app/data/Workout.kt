@@ -20,36 +20,42 @@ data class Exercise(
     val isCustom: Boolean = false
 )
 
-/** 一次训练：当天一场（含时长），组记录见 WorkoutSet。 */
-@Entity(tableName = "workouts", indices = [Index("date")])
-data class Workout(
+/**
+ * 一条训练记录（对齐饮食记录的逐条添加模式）：
+ * 器械组次型填重量+次数；计时型动作（平板支撑/跑步等）填时长分钟。
+ * 同一天的若干条 = 一次训练。
+ */
+@Entity(
+    tableName = "training_entries",
+    indices = [Index("date"), Index("exerciseId")]
+)
+data class TrainingEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val date: String,          // yyyy-MM-dd
-    val durationMin: Int,
-    val createdAt: Long
-)
-
-/** 组记录：某次训练里某个动作的一组（重量 × 次数）。 */
-@Entity(
-    tableName = "workout_sets",
-    indices = [Index("workoutId"), Index("exerciseId")]
-)
-data class WorkoutSet(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val workoutId: Long,
     val exerciseId: Long,
-    val weightKg: Double,
-    val reps: Int
+    val weightKg: Double?,      // 器械型：重量
+    val reps: Int?,            // 器械型：次数
+    val durationMin: Int?,      // 计时型：时长（分钟）
+    val createdAt: Long
+) {
+    /** 列表显示文案："60 kg × 12" 或 "15 分钟" */
+    val display: String
+        get() = when {
+            weightKg != null && reps != null -> trimNum(weightKg) + " kg × $reps"
+            durationMin != null -> "$durationMin 分钟"
+            else -> ""
+        }
+}
+
+/** 「我」页最近一次训练摘要（一天一行聚合）。 */
+data class TrainingSummary(
+    val date: String,
+    val entryCount: Int,
+    val exerciseCount: Int
 )
 
-/** 「我」页最近一次训练摘要（一次查询带出动作数与组数）。 */
-data class WorkoutSummary(
-    val id: Long,
-    val date: String,
-    val durationMin: Int,
-    val exerciseCount: Int,
-    val setCount: Int
-)
+private fun trimNum(value: Double): String =
+    if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
 
 @Dao
 interface ExerciseDao {
@@ -65,37 +71,23 @@ interface ExerciseDao {
 }
 
 @Dao
-interface WorkoutDao {
+interface TrainingEntryDao {
+
+    @Query("SELECT * FROM training_entries WHERE date = :date ORDER BY id")
+    fun observeByDate(date: String): Flow<List<TrainingEntry>>
+
+    @Query("SELECT * FROM training_entries WHERE exerciseId = :exerciseId ORDER BY id DESC LIMIT 1")
+    suspend fun lastOf(exerciseId: Long): TrainingEntry?
 
     @Insert
-    suspend fun insert(workout: Workout): Long
+    suspend fun insert(entry: TrainingEntry): Long
 
-    @Query("SELECT * FROM workouts ORDER BY id DESC LIMIT 1")
-    fun observeLatest(): Flow<Workout?>
-
-    /** 最近一次包含指定动作的训练（用于"上次成绩"带过）。 */
-    @Query(
-        "SELECT * FROM workouts WHERE id IN " +
-            "(SELECT workoutId FROM workout_sets WHERE exerciseId = :exerciseId) " +
-            "ORDER BY id DESC LIMIT 1"
-    )
-    suspend fun lastWithExercise(exerciseId: Long): Workout?
+    @Query("DELETE FROM training_entries WHERE id = :id")
+    suspend fun delete(id: Long)
 
     @Query(
-        "SELECT w.id, w.date, w.durationMin, " +
-            "COUNT(DISTINCT s.exerciseId) as exerciseCount, COUNT(s.id) as setCount " +
-            "FROM workouts w LEFT JOIN workout_sets s ON s.workoutId = w.id " +
-            "GROUP BY w.id ORDER BY w.id DESC LIMIT 1"
+        "SELECT date, COUNT(*) as entryCount, COUNT(DISTINCT exerciseId) as exerciseCount " +
+            "FROM training_entries GROUP BY date ORDER BY date DESC LIMIT 1"
     )
-    fun observeLatestSummary(): Flow<WorkoutSummary?>
-}
-
-@Dao
-interface WorkoutSetDao {
-
-    @Insert
-    suspend fun insertAll(sets: List<WorkoutSet>)
-
-    @Query("SELECT * FROM workout_sets WHERE workoutId = :workoutId AND exerciseId = :exerciseId ORDER BY id")
-    suspend fun ofExerciseInWorkout(workoutId: Long, exerciseId: Long): List<WorkoutSet>
+    fun observeLatestSummary(): Flow<TrainingSummary?>
 }

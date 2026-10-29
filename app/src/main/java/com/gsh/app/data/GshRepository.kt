@@ -29,8 +29,7 @@ class GshRepository(context: Context) {
     val photoDao: PhotoDao = db.photoDao()
     val weightLogDao: WeightLogDao = db.weightLogDao()
     val exerciseDao: ExerciseDao = db.exerciseDao()
-    val workoutDao: WorkoutDao = db.workoutDao()
-    val workoutSetDao: WorkoutSetDao = db.workoutSetDao()
+    val trainingEntryDao: TrainingEntryDao = db.trainingEntryDao()
     val settings: SettingsStore = SettingsStore(context)
     val searchHistory: SearchHistoryStore = SearchHistoryStore(context)
 
@@ -83,20 +82,20 @@ class GshRepository(context: Context) {
     }
 
     /**
-     * 上次某动作的成绩（最近一次包含它的训练里的全部组），供录入页一键带过。
+     * 上次某动作的最近一条记录（重量/次数/时长），录入表单"上次带过"用。
      */
-    suspend fun lastSetsOf(exerciseId: Long): List<WorkoutSet> {
-        val workout = workoutDao.lastWithExercise(exerciseId) ?: return emptyList()
-        return workoutSetDao.ofExerciseInWorkout(workout.id, exerciseId)
+    suspend fun lastEntryOf(exerciseId: Long): TrainingEntry? =
+        trainingEntryDao.lastOf(exerciseId)
+
+    /** 添加一条训练记录，并把当天标记为训练日。 */
+    suspend fun addTrainingEntry(entry: TrainingEntry) {
+        trainingEntryDao.insert(entry)
+        setDayType(entry.date, true)
     }
 
-    /** 保存一次训练：训练 + 全部组记录；并把当天标记为训练日。 */
-    suspend fun saveWorkout(date: String, durationMin: Int, sets: List<WorkoutSet>) {
-        val workoutId = workoutDao.insert(
-            Workout(date = date, durationMin = durationMin, createdAt = System.currentTimeMillis())
-        )
-        workoutSetDao.insertAll(sets.map { it.copy(id = 0, workoutId = workoutId) })
-        setDayType(date, true)
+    /** 删除一条训练记录。 */
+    suspend fun deleteTrainingEntry(id: Long) {
+        trainingEntryDao.delete(id)
     }
 
     /**

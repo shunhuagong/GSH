@@ -10,9 +10,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [
         Food::class, MealEntry::class, DayType::class, Photo::class, WeightLog::class,
-        Exercise::class, Workout::class, WorkoutSet::class
+        Exercise::class, TrainingEntry::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,8 +24,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun weightLogDao(): WeightLogDao
     abstract fun exerciseDao(): ExerciseDao
-    abstract fun workoutDao(): WorkoutDao
-    abstract fun workoutSetDao(): WorkoutSetDao
+    abstract fun trainingEntryDao(): TrainingEntryDao
 
     companion object {
         @Volatile
@@ -89,6 +88,23 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v6 → v7：训练记录改为逐条模式（对齐饮食记录交互）——
+         * 新增 training_entries 表；旧 workouts/workout_sets 表保留在库中但不再使用。
+         */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `training_entries` " +
+                        "(`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `date` TEXT NOT NULL, " +
+                        "`exerciseId` INTEGER NOT NULL, `weightKg` REAL, `reps` INTEGER, " +
+                        "`durationMin` INTEGER, `createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_training_entries_date` ON `training_entries` (`date`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_training_entries_exerciseId` ON `training_entries` (`exerciseId`)")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -96,7 +112,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gsh.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     // 其他未显式迁移的版本变更才走重建（早期开发阶段保护）
                     .fallbackToDestructiveMigration()
                     .build()

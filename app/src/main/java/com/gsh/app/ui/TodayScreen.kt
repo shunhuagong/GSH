@@ -57,11 +57,49 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.gsh.app.ai.AiUiState
 import com.gsh.app.data.DateUtils
+import com.gsh.app.data.Exercise
 import com.gsh.app.data.Food
 import com.gsh.app.data.MealEntry
 import com.gsh.app.data.NutritionTargets
 import com.gsh.app.data.Photo
+import com.gsh.app.data.TrainingEntry
 import java.io.File
+
+/** 今日页训练入口行：训练日显示；无记录时引导添加，有记录时显示动作×条数。 */
+@Composable
+private fun TrainingTodayRow(
+    entries: List<TrainingEntry>,
+    exercises: List<Exercise>,
+    onAdd: () -> Unit
+) {
+    val summary = entries.groupBy { it.exerciseId }.entries
+        .mapNotNull { (id, list) -> exercises.find { it.id == id }?.let { it.name to list.size } }
+        .joinToString(" · ") { "${it.first} ×${it.second}" }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onAdd() }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                summary.ifEmpty { "记一下今天的训练" },
+                fontSize = 14.sp,
+                fontWeight = if (summary.isEmpty()) FontWeight.Normal else FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = "添加训练",
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
 
 /** onAddClick 参数为餐别（0~3），-1 表示由添加页按时间自动选择。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,6 +115,13 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
     // 月历标记：有记录的日子按训练/休息显示 💪/😴
     val dayTypes by vm.dayTypes.collectAsState()
     val totals by vm.dailyTotals.collectAsState()
+    // 训练记录（今日入口）
+    val trainingToday by vm.trainingToday.collectAsState()
+    val exercises by vm.exercises.collectAsState()
+    var showTrainingAdd by remember { mutableStateOf(false) }
+    if (showTrainingAdd) {
+        AddTrainingDialog(vm = vm, onDismiss = { showTrainingAdd = false })
+    }
 
     var editingEntry by remember { mutableStateOf<MealEntry?>(null) }
     var celebrationTick by remember { mutableStateOf(0) }
@@ -183,6 +228,15 @@ fun TodayScreen(vm: GshViewModel, onAddClick: (Int) -> Unit, onCopyClick: () -> 
                 isTraining = isTrainingDay,
                 onChange = { vm.setDayType(date, it) }
             )
+        }
+        if (isTrainingDay) {
+            item {
+                TrainingTodayRow(
+                    entries = trainingToday,
+                    exercises = exercises,
+                    onAdd = { showTrainingAdd = true }
+                )
+            }
         }
         item { NutritionSummaryCard(entries = entries, targets = targets) }
         item {
