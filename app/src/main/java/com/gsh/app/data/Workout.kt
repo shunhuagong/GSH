@@ -89,6 +89,17 @@ interface TrainingEntryDao {
     @Insert
     suspend fun insert(entry: TrainingEntry): Long
 
+    @Insert
+    suspend fun insertAll(entries: List<TrainingEntry>)
+
+    /** 上次某动作的全部组（最近一个有训练日的条目，按入库顺序），多组带过用。 */
+    @Query(
+        "SELECT * FROM training_entries WHERE exerciseId = :exerciseId " +
+            "AND date = (SELECT MAX(date) FROM training_entries WHERE exerciseId = :exerciseId) " +
+            "ORDER BY id"
+    )
+    suspend fun lastSetsOf(exerciseId: Long): List<TrainingEntry>
+
     @Query("DELETE FROM training_entries WHERE id = :id")
     suspend fun delete(id: Long)
 

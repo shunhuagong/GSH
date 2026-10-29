@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -87,10 +88,23 @@ class GshRepository(context: Context) {
     suspend fun lastEntryOf(exerciseId: Long): TrainingEntry? =
         trainingEntryDao.lastOf(exerciseId)
 
+    /** 上次某动作的全部组（多组录入的"第 N 组带上次第 N 组"用）。 */
+    suspend fun lastSetsOf(exerciseId: Long): List<TrainingEntry> =
+        trainingEntryDao.lastSetsOf(exerciseId)
+
     /** 添加一条训练记录，并把当天标记为训练日。 */
     suspend fun addTrainingEntry(entry: TrainingEntry) {
         trainingEntryDao.insert(entry)
         setDayType(entry.date, true)
+    }
+
+    /**
+     * 多组卡片原子保存：全部条目一个事务入库（失败整体回滚、不留半截），
+     * 成功后当天标记为训练日。取消不调用本方法，自然零残留。
+     */
+    suspend fun saveTrainingEntries(entries: List<TrainingEntry>) = db.withTransaction {
+        trainingEntryDao.insertAll(entries)
+        entries.firstOrNull()?.let { setDayType(it.date, true) }
     }
 
     /** 删除一条训练记录。 */

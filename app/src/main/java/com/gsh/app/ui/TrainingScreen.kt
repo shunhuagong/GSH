@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -31,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -89,7 +91,8 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium
                         )
-                        list.forEach { entry ->
+                        // 组号为显示层概念：当天该动作按入库顺序编号，删除后自动补位
+                        list.forEachIndexed { setIndex, entry ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -97,7 +100,7 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    entry.display,
+                                    "第 ${setIndex + 1} 组  ${entry.display}",
                                     fontSize = 14.sp,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -127,116 +130,223 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
 }
 
 /**
- * 添加一条训练的对话框（今日页 / 训练记录页共用）：
- * 选动作（内置 + 自定义新建）→ 填重量×次数（器械）或时长分钟（计时）→ 保存即入库。
+ * 添加训练：第一步只选动作；选完进入该动作的多组卡片——
+ * 组行编辑、整行宽加组、原子保存全部 / 取消零残留。
+ * 与饮食记录同为逐条模式，但一次可存多组。
  */
 @Composable
 fun AddTrainingDialog(vm: GshViewModel, onDismiss: () -> Unit) {
     val exercises by vm.exercises.collectAsState()
-    var selected by remember { mutableStateOf(exercises.firstOrNull()) }
-    var showPicker by remember { mutableStateOf(false) }
-    var weight by remember { mutableStateOf("") }
-    var reps by remember { mutableStateOf("") }
-    var duration by remember { mutableStateOf("") }
+    var selected by remember { mutableStateOf<Exercise?>(null) }
 
-    // 选中动作后显示"上次"成绩，一键带过
-    var lastEntry by remember { mutableStateOf<TrainingEntry?>(null) }
-    LaunchedEffect(selected?.id) {
-        lastEntry = selected?.let { vm.lastEntryOf(it.id) }
-    }
-
-    if (showPicker) {
+    if (selected == null) {
+        // 第一步：选动作（取消 = 关闭整个添加）
         ExerciseSelectDialog(
             exercises = exercises,
-            onPick = {
-                if (it != null) selected = it
-                showPicker = false
-            },
+            onPick = { if (it != null) selected = it else onDismiss() },
             onAddCustom = { name, group, done ->
                 vm.addCustomExercise(name, group) { created ->
                     done(created)
                     if (created != null) selected = created
                 }
             },
-            onDismiss = { showPicker = false }
+            onDismiss = onDismiss
+        )
+        return
+    }
+    MultiSetCardDialog(
+        vm = vm,
+        exercise = selected!!,
+        onChangeExercise = { selected = null },
+        onDismiss = onDismiss
+    )
+}
+
+/** 单组草稿行：三个文本输入（重量 / 次数 / 时长），按合法组合解析。 */
+private class DraftRow {
+    var weight by mutableStateOf("")
+    var reps by mutableStateOf("")
+    var duration by mutableStateOf("")
+
+    /** 全空行：保存时跳过 */
+    fun isBlankRow() = weight.isBlank() && reps.isBlank() && duration.isBlank()
+
+    /** 解析为 (weight, reps, duration)：合法返回组合，全空/脏组合返回 null */
+    fun parse(): Triple<Double?, Int?, Int?>? {
+        val w = weight.toDoubleOrNull()
+        val r = reps.toIntOrNull()
+        val d = duration.toIntOrNull()
+        val hasStrength = w != null && w > 0 && r != null && r > 0
+        val hasRepsOnly = weight.isBlank() && r != null && r > 0
+        val hasDuration = weight.isBlank() && reps.isBlank() && d != null && d > 0
+        return when {
+            hasStrength -> Triple(w, r, null)
+            hasRepsOnly -> Triple(null, r, null)
+            hasDuration -> Triple(null, null, d)
+            else -> null
+        }
+    }
+}
+
+/** 第二步：某动作的多组卡片。 */
+@Composable
+private fun MultiSetCardDialog(
+    vm: GshViewModel,
+    exercise: Exercise,
+    onChangeExercise: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    // 上次该动作的全部组（带过规则：第 N 组带上次第 N 组，不足带上一组）
+    var lastSets by remember(exercise.id) { mutableStateOf<List<TrainingEntry>>(emptyList()) }
+    LaunchedEffect(exercise.id) {
+        lastSets = vm.lastSetsOf(exercise.id)
+    }
+
+    // 上次全是时长记录 → 计时动作：组行精简为时长单框
+    val isDurationType = lastSets.isNotEmpty() &&
+        lastSets.all { it.weightKg == null && it.reps == null && it.durationMin != null }
+
+    val rows = remember(exercise.id) { mutableStateListOf<DraftRow>() }
+
+    fun bring(from: TrainingEntry) {
+        rows.add(
+            DraftRow().apply {
+                weight = from.weightKg?.let { trimNum(it) } ?: ""
+                reps = from.reps?.toString() ?: ""
+                duration = from.durationMin?.toString() ?: ""
+            }
         )
     }
 
-    val w = weight.toDoubleOrNull()
-    val r = reps.toIntOrNull()
-    val d = duration.toIntOrNull()
-    // 三种合法组合：重量×次数（器械）/ 纯次数（自重，如俯卧撑）/ 纯时长（平板支撑等）；
-    // "重量无次数""重量+时长""次数+时长"等脏组合一律不合法
-    val hasStrength = w != null && w > 0 && r != null && r > 0
-    val hasRepsOnly = w == null && r != null && r > 0
-    val hasDuration = w == null && r == null && d != null && d > 0
-    val valid = selected != null && (hasStrength || hasRepsOnly || hasDuration)
+    fun addRow() {
+        val n = rows.size + 1
+        val from = lastSets.getOrNull(n - 1) ?: lastSets.lastOrNull()
+        if (from != null) bring(from) else rows.add(DraftRow())
+    }
+
+    // 打开卡片：第 1 组自动带过上次第 1 组
+    LaunchedEffect(exercise.id, lastSets) {
+        if (rows.isEmpty() && lastSets.isNotEmpty()) bring(lastSets.first())
+    }
+
+    val parsed = rows.mapNotNull { it.parse() }
+    val hasDirty = rows.any { !it.isBlankRow() && it.parse() == null }
+    val valid = parsed.isNotEmpty() && !hasDirty
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("添加训练") },
-        text = {
-            Column {
-                OutlinedButton(
-                    onClick = { showPicker = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(selected?.name ?: "选择动作", fontWeight = FontWeight.Bold)
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    exercise.name,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onChangeExercise) {
+                    Text("换动作", fontSize = 13.sp)
                 }
-                lastEntry?.let {
+            }
+        },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                if (lastSets.isNotEmpty()) {
+                    val bestDisplay = lastSets.maxByOrNull { it.weightKg ?: 0.0 }?.display ?: ""
                     TextButton(onClick = {
-                        weight = it.weightKg?.let { kg -> trimNum(kg) } ?: ""
-                        reps = it.reps?.toString() ?: ""
-                        duration = it.durationMin?.toString() ?: ""
+                        rows.clear()
+                        lastSets.forEach { bring(it) }
                     }) {
-                        Text("上次：${it.display}（点击带过）", fontSize = 12.sp)
+                        Text(
+                            "上次 ${lastSets.size} 组，最好 $bestDisplay（点击全部带过）",
+                            fontSize = 12.sp
+                        )
+                    }
+                } else {
+                    Text(
+                        "自重动作重量可不填；计时动作只填时长",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                rows.forEachIndexed { index, row ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            "第 ${index + 1} 组",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (isDurationType) {
+                            OutlinedTextField(
+                                value = row.duration,
+                                onValueChange = { row.duration = it },
+                                label = { Text("时长") },
+                                suffix = { Text("分钟") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        } else {
+                            OutlinedTextField(
+                                value = row.weight,
+                                onValueChange = { row.weight = it },
+                                label = { Text("重量") },
+                                suffix = { Text("kg") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = row.reps,
+                                onValueChange = { row.reps = it },
+                                label = { Text("次数") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = row.duration,
+                                onValueChange = { row.duration = it },
+                                label = { Text("时长") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        IconButton(
+                            onClick = { rows.removeAt(index) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Close,
+                                contentDescription = "删除该组",
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = weight,
-                        onValueChange = { weight = it },
-                        label = { Text("重量（自重可不填）") },
-                        suffix = { Text("kg") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = reps,
-                        onValueChange = { reps = it },
-                        label = { Text("次数") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
                 Spacer(Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = duration,
-                    onValueChange = { duration = it },
-                    label = { Text("时长（计时动作填这个，如平板支撑）") },
-                    suffix = { Text("分钟") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
+                // 整行宽加组按钮：训练手汗/镁粉场景下不易误触
+                OutlinedButton(
+                    onClick = { addRow() },
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    Text(if (rows.isEmpty()) "＋ 记一组" else "＋ 添加一组")
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    val ex = selected ?: return@TextButton
-                    vm.addTrainingEntry(
-                        exerciseId = ex.id,
-                        weightKg = if (hasStrength) w else null,
-                        reps = if (hasStrength || hasRepsOnly) r else null,
-                        durationMin = if (hasDuration) d else null
-                    )
+                    vm.saveTrainingEntries(exercise.id, parsed)
                     onDismiss()
                 },
                 enabled = valid
-            ) { Text("保存") }
+            ) { Text("保存全部") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("取消") }

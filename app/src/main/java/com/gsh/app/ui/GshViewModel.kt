@@ -444,6 +444,30 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
     /** 上次某动作的记录，表单"上次带过"用。 */
     suspend fun lastEntryOf(exerciseId: Long): TrainingEntry? = repo.lastEntryOf(exerciseId)
 
+    /** 上次某动作的全部组（多组卡片带过规则：第 N 组带上次第 N 组）。 */
+    suspend fun lastSetsOf(exerciseId: Long): List<TrainingEntry> = repo.lastSetsOf(exerciseId)
+
+    /** 多组卡片原子保存：一次入库全部组，当天自动标记训练日；取消则不调用、零残留。 */
+    fun saveTrainingEntries(
+        exerciseId: Long,
+        rows: List<Triple<Double?, Int?, Int?>>
+    ) {
+        viewModelScope.launch {
+            repo.saveTrainingEntries(
+                rows.map { (w, r, d) ->
+                    TrainingEntry(
+                        date = DateUtils.today(),
+                        exerciseId = exerciseId,
+                        weightKg = w,
+                        reps = r,
+                        durationMin = d,
+                        createdAt = System.currentTimeMillis()
+                    )
+                }
+            )
+        }
+    }
+
     /** 新增自定义动作，回调返回动作。 */
     fun addCustomExercise(name: String, muscleGroup: String, onDone: (Exercise?) -> Unit) {
         if (name.isBlank()) {

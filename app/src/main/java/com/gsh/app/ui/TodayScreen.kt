@@ -74,7 +74,7 @@ private fun TrainingTodayRow(
 ) {
     val summary = entries.groupBy { it.exerciseId }.entries
         .mapNotNull { (id, list) -> exercises.find { it.id == id }?.let { it.name to list.size } }
-        .joinToString(" · ") { "${it.first} ×${it.second}" }
+        .joinToString(" · ") { "${it.first} ${it.second} 组" }
     Card(
         modifier = Modifier
             .fillMaxWidth()
