@@ -162,7 +162,7 @@ fun GshApp(vm: GshViewModel = viewModel(factory = GshViewModel.Factory)) {
                     MeScreen(
                         vm = vm,
                         onOpenSettings = { navController.navigate("settings") },
-                        onOpenWorkout = { navController.navigate("workout") }
+                        onOpenWorkout = { navController.navigate("training") }
                     )
                 }
                 // 训练记录页（逐条添加模式，从「我」页/今日页进入）
