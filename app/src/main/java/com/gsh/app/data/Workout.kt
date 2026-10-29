@@ -38,10 +38,11 @@ data class TrainingEntry(
     val durationMin: Int?,      // 计时型：时长（分钟）
     val createdAt: Long
 ) {
-    /** 列表显示文案："60 kg × 12" 或 "15 分钟" */
+    /** 列表显示文案："60 kg × 12" / "20 个"（纯次数）/ "15 分钟" */
     val display: String
         get() = when {
             weightKg != null && reps != null -> trimNum(weightKg) + " kg × $reps"
+            reps != null -> "$reps 个"
             durationMin != null -> "$durationMin 分钟"
             else -> ""
         }

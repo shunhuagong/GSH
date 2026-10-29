@@ -145,7 +145,7 @@ fun AddTrainingDialog(vm: GshViewModel, onDismiss: () -> Unit) {
         lastEntry = selected?.let { vm.lastEntryOf(it.id) }
     }
 
-    if (showPicker && selected != null) {
+    if (showPicker) {
         ExerciseSelectDialog(
             exercises = exercises,
             onPick = {
@@ -165,9 +165,12 @@ fun AddTrainingDialog(vm: GshViewModel, onDismiss: () -> Unit) {
     val w = weight.toDoubleOrNull()
     val r = reps.toIntOrNull()
     val d = duration.toIntOrNull()
+    // 三种合法组合：重量×次数（器械）/ 纯次数（自重，如俯卧撑）/ 纯时长（平板支撑等）；
+    // "重量无次数""重量+时长""次数+时长"等脏组合一律不合法
     val hasStrength = w != null && w > 0 && r != null && r > 0
-    val hasDuration = d != null && d > 0
-    val valid = selected != null && (hasStrength || hasDuration)
+    val hasRepsOnly = w == null && r != null && r > 0
+    val hasDuration = w == null && r == null && d != null && d > 0
+    val valid = selected != null && (hasStrength || hasRepsOnly || hasDuration)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -193,7 +196,7 @@ fun AddTrainingDialog(vm: GshViewModel, onDismiss: () -> Unit) {
                     OutlinedTextField(
                         value = weight,
                         onValueChange = { weight = it },
-                        label = { Text("重量") },
+                        label = { Text("重量（自重可不填）") },
                         suffix = { Text("kg") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
@@ -227,8 +230,8 @@ fun AddTrainingDialog(vm: GshViewModel, onDismiss: () -> Unit) {
                     vm.addTrainingEntry(
                         exerciseId = ex.id,
                         weightKg = if (hasStrength) w else null,
-                        reps = if (hasStrength) r else null,
-                        durationMin = if (!hasStrength && hasDuration) d else null
+                        reps = if (hasStrength || hasRepsOnly) r else null,
+                        durationMin = if (hasDuration) d else null
                     )
                     onDismiss()
                 },
