@@ -161,8 +161,13 @@ fun GshApp(vm: GshViewModel = viewModel(factory = GshViewModel.Factory)) {
                 composable("me") {
                     MeScreen(
                         vm = vm,
-                        onOpenSettings = { navController.navigate("settings") }
+                        onOpenSettings = { navController.navigate("settings") },
+                        onOpenWorkout = { navController.navigate("workout") }
                     )
+                }
+                // 训练中录入页（从「我」页进入）
+                composable("workout") {
+                    WorkoutScreen(vm = vm, onDone = { navController.popBackStack() })
                 }
                 // 设置改为「我」页进入的二级页（不显示底部导航）
                 composable("settings") {

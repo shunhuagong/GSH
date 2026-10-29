@@ -54,15 +54,16 @@ import com.gsh.app.data.DateUtils
 import com.gsh.app.data.Photo
 
 /**
- * 「我」页：极简——头像与右上角齿轮进设置。
+ * 「我」页：极简头部（头像与齿轮）+ 近30天成绩 + 体重 + 训练摘要。
  * 头像默认用启动插画，右下角 + 角标从相册选图更换。
  */
 @Composable
-fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
+fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit, onOpenWorkout: () -> Unit) {
     val avatarPhoto: Photo? = vm.avatar.collectAsState().value
     val stats by vm.last30Stats.collectAsState()
     val profile by vm.profile.collectAsState()
     val weightLogs by vm.weightLogs.collectAsState()
+    val latestWorkout by vm.latestWorkout.collectAsState()
 
     var showWeightDialog by remember { mutableStateOf(false) }
     var weightInput by remember { mutableStateOf("") }
@@ -274,6 +275,36 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 16.dp)
             )
+        }
+
+        // 训练摘要：最近一次 + 录入入口
+        Spacer(Modifier.height(32.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "🏋️ 训练",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    latestWorkout?.let { w ->
+                        "最近：%s · %d 分钟 · %d 个动作 %d 组".format(
+                            DateUtils.display(w.date), w.durationMin, w.exerciseCount, w.setCount
+                        )
+                    } ?: "还没有训练记录",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            OutlinedButton(onClick = onOpenWorkout) {
+                Text("记训练")
+            }
         }
 
         if (showWeightDialog) {
