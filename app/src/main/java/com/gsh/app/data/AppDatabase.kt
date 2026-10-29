@@ -113,8 +113,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "gsh.db"
                 )
                     .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
-                    // 其他未显式迁移的版本变更才走重建（早期开发阶段保护）
-                    .fallbackToDestructiveMigration()
+                    // 手机里已有真实数据：迁移缺失/失败必须抛错暴露，绝不静默清库重建
                     .build()
                     .also { instance = it }
             }
