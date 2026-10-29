@@ -48,6 +48,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.gsh.app.R
 import com.gsh.app.data.DateUtils
@@ -58,7 +59,12 @@ import com.gsh.app.data.Photo
  * 头像默认用启动插画，右下角 + 角标从相册选图更换。
  */
 @Composable
-fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit, onOpenWorkout: () -> Unit) {
+fun MeScreen(
+    vm: GshViewModel,
+    onOpenSettings: () -> Unit,
+    onOpenWorkout: () -> Unit,
+    onOpenProgress: () -> Unit
+) {
     val avatarPhoto: Photo? = vm.avatar.collectAsState().value
     val stats by vm.last30Stats.collectAsState()
     val profile by vm.profile.collectAsState()
@@ -305,6 +311,12 @@ fun MeScreen(vm: GshViewModel, onOpenSettings: () -> Unit, onOpenWorkout: () -> 
             OutlinedButton(onClick = onOpenWorkout) {
                 Text("记训练")
             }
+        }
+        TextButton(
+            onClick = onOpenProgress,
+            modifier = Modifier.padding(start = 8.dp)
+        ) {
+            Text("📈 查看训练进步", fontSize = 13.sp)
         }
 
         if (showWeightDialog) {

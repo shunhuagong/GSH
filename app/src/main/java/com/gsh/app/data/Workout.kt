@@ -55,6 +55,12 @@ data class TrainingSummary(
     val exerciseCount: Int
 )
 
+/** 看板用：某动作的全部记录（按日升序，内存聚合每日最好一组）。 */
+data class ExerciseCount(
+    val exerciseId: Long,
+    val cnt: Int
+)
+
 private fun trimNum(value: Double): String =
     if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
 
@@ -91,4 +97,12 @@ interface TrainingEntryDao {
             "FROM training_entries GROUP BY date ORDER BY date DESC LIMIT 1"
     )
     fun observeLatestSummary(): Flow<TrainingSummary?>
+
+    /** 某动作的全部记录（看板内存聚合用，按日升序）。 */
+    @Query("SELECT * FROM training_entries WHERE exerciseId = :exerciseId ORDER BY date, id")
+    fun observeByExercise(exerciseId: Long): Flow<List<TrainingEntry>>
+
+    /** 各动作的记录条数（看板动作条：只列出有记录的动作，条数多的排前）。 */
+    @Query("SELECT exerciseId, COUNT(*) as cnt FROM training_entries GROUP BY exerciseId ORDER BY cnt DESC")
+    fun observeExerciseCounts(): Flow<List<ExerciseCount>>
 }

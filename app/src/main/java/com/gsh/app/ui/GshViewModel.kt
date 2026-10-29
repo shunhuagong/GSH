@@ -14,6 +14,7 @@ import com.gsh.app.data.AiConfig
 import com.gsh.app.data.DailyTotal
 import com.gsh.app.data.DateUtils
 import com.gsh.app.data.Exercise
+import com.gsh.app.data.ExerciseCount
 import com.gsh.app.data.Food
 import com.gsh.app.data.GshRepository
 import com.gsh.app.data.MealEntry
@@ -478,6 +479,96 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
 
     fun deleteTrainingEntry(id: Long) {
         viewModelScope.launch { repo.deleteTrainingEntry(id) }
+    }
+
+    // ---------- 训练进步看板 ----------
+
+    /** 看板里的一天一点：当日最好一组的值与文案。 */
+    data class DayPoint(val date: String, val value: Double, val display: String)
+
+    /** 看板数据：动作 + 每日点（升序）+ 最好成绩 + 较上次变化 + 是否新纪录。 */
+    data class ProgressData(
+        val exercise: Exercise,
+        val points: List<DayPoint>,
+        val bestPoint: DayPoint?,
+        val lastPoint: DayPoint?,
+        val diffText: String?,   // null = 单点或持平不显示
+        val isRecord: Boolean
+    )
+
+    private val _progressExerciseId = MutableStateFlow<Long?>(null)
+
+    fun setProgressExercise(id: Long) {
+        _progressExerciseId.value = id
+    }
+
+    /** 有记录的动作及条数（看板动作条）。 */
+    val exerciseCounts: StateFlow<List<ExerciseCount>> =
+        repo.trainingEntryDao.observeExerciseCounts()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 看板数据：随选中动作切换（默认记录最多的动作）。 */
+    val progressData: StateFlow<ProgressData?> =
+        combine(exerciseCounts, _progressExerciseId) { counts, selected ->
+            selected ?: counts.firstOrNull()?.exerciseId
+        }.flatMapLatest { id ->
+            if (id == null) flowOf(null)
+            else combine(repo.trainingEntryDao.observeByExercise(id), exercises) { entries, exList ->
+                val exercise = exList.find { it.id == id } ?: return@combine null
+                aggregateProgress(exercise, entries)
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * 每日聚合成一个点（口径：有重量记录→当天最好一组=重量最大、同重量次数多者；
+     * 纯次数→当天最大次数；计时→当天最长分钟），最好一组从原始记录内比较，
+     * 重量与次数天然来自同一组，不存在 MAX 交叉错配。
+     */
+    private fun aggregateProgress(exercise: Exercise, entries: List<TrainingEntry>): ProgressData? {
+        if (entries.isEmpty()) return null
+        val metric = when {
+            entries.any { it.weightKg != null } -> 0   // 重量口径
+            entries.any { it.reps != null } -> 1        // 次数口径
+            else -> 2                                   // 时长口径
+        }
+        val points = entries.groupBy { it.date }.toSortedMap().mapNotNull { (date, list) ->
+            val best = when (metric) {
+                0 -> list.filter { it.weightKg != null }
+                    .maxWithOrNull(compareBy({ it.weightKg!! }, { it.reps ?: 0 }))
+                1 -> list.maxByOrNull { it.reps ?: 0 }
+                else -> list.maxByOrNull { it.durationMin ?: 0 }
+            } ?: return@mapNotNull null
+            val value = when (metric) {
+                0 -> best.weightKg!!
+                1 -> (best.reps ?: 0).toDouble()
+                else -> (best.durationMin ?: 0).toDouble()
+            }
+            DayPoint(date, value, best.display)
+        }
+        if (points.isEmpty()) return null
+        val best = points.maxByOrNull { it.value }
+        val last = points.last()
+        val prev = points.getOrNull(points.size - 2)
+        val diff = prev?.let { last.value - it.value }
+        val diffText = when {
+            diff == null || diff == 0.0 -> null
+            diff > 0 -> "↑ 较上次 +${trimNum(diff)}${metricUnit(metric)}"
+            else -> "↓ 较上次 -${trimNum(-diff)}${metricUnit(metric)}"
+        }
+        return ProgressData(
+            exercise = exercise,
+            points = points,
+            bestPoint = best,
+            lastPoint = last,
+            diffText = diffText,
+            isRecord = last.value >= (best?.value ?: 0.0)
+        )
+    }
+
+    private fun metricUnit(metric: Int) = when (metric) {
+        0 -> " kg"
+        1 -> " 个"
+        else -> " 分钟"
     }
 
     companion object {

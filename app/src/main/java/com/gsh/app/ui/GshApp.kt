@@ -162,12 +162,17 @@ fun GshApp(vm: GshViewModel = viewModel(factory = GshViewModel.Factory)) {
                     MeScreen(
                         vm = vm,
                         onOpenSettings = { navController.navigate("settings") },
-                        onOpenWorkout = { navController.navigate("training") }
+                        onOpenWorkout = { navController.navigate("training") },
+                        onOpenProgress = { navController.navigate("progress") }
                     )
                 }
                 // 训练记录页（逐条添加模式，从「我」页/今日页进入）
                 composable("training") {
                     TrainingScreen(vm = vm, onDone = { navController.popBackStack() })
+                }
+                // 训练进步看板（「我」页进入）
+                composable("progress") {
+                    TrainingProgressScreen(vm = vm, onDone = { navController.popBackStack() })
                 }
                 // 设置改为「我」页进入的二级页（不显示底部导航）
                 composable("settings") {
