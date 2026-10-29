@@ -13,6 +13,7 @@ import com.gsh.app.ai.AiUiState
 import com.gsh.app.data.AiConfig
 import com.gsh.app.data.DailyTotal
 import com.gsh.app.data.DateUtils
+import com.gsh.app.data.Exercise
 import com.gsh.app.data.Food
 import com.gsh.app.data.GshRepository
 import com.gsh.app.data.MealEntry
@@ -20,6 +21,8 @@ import com.gsh.app.data.NutritionTargets
 import com.gsh.app.data.Photo
 import com.gsh.app.data.UserProfile
 import com.gsh.app.data.WeightLog
+import com.gsh.app.data.WorkoutSet
+import com.gsh.app.data.WorkoutSummary
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -46,6 +49,7 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
 
     init {
         viewModelScope.launch { repo.seedFoods() }
+        viewModelScope.launch { repo.seedExercises() }
         // 近30天没记录的天按默认训练日补账，之后统计可直接累加
         viewModelScope.launch { repo.backfillDayTypes(30) }
     }
@@ -417,6 +421,47 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
     /** 记录今日体重（重复记则覆盖），并同步更新设置里的体重。 */
     fun recordWeight(weightKg: Double) {
         viewModelScope.launch { repo.recordWeight(DateUtils.today(), weightKg) }
+    }
+
+    // ---------- 训练记录 ----------
+
+    /** 动作库（内置 + 自定义），录入页选择用。 */
+    val exercises: StateFlow<List<Exercise>> =
+        repo.exerciseDao.observeAll()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 最近一次训练摘要（「我」页展示用）。 */
+    val latestWorkout: StateFlow<WorkoutSummary?> =
+        repo.workoutDao.observeLatestSummary()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** 上次某动作的全部组（重量, 次数），录入页"上次带过"用。 */
+    suspend fun lastSetsOf(exerciseId: Long): List<Pair<Double, Int>> =
+        repo.lastSetsOf(exerciseId).map { it.weightKg to it.reps }
+
+    /** 新增自定义动作，返回动作。 */
+    fun addCustomExercise(name: String, muscleGroup: String, onDone: (Exercise?) -> Unit) {
+        if (name.isBlank()) {
+            onDone(null)
+            return
+        }
+        viewModelScope.launch {
+            val id = repo.addCustomExercise(name, muscleGroup)
+            val exercise = Exercise(id = id, name = name.trim(), muscleGroup = muscleGroup, isCustom = true)
+            onDone(exercise)
+        }
+    }
+
+    /** 保存一次训练（组记录按动作分组传入），保存后当天自动标记为训练日。 */
+    fun saveWorkout(durationMin: Int, setsByExercise: Map<Long, List<Pair<Double, Int>>>) {
+        viewModelScope.launch {
+            val flat = setsByExercise.flatMap { (exerciseId, sets) ->
+                sets.map { (w, r) -> WorkoutSet(exerciseId = exerciseId, weightKg = w, reps = r, workoutId = 0) }
+            }
+            if (flat.isNotEmpty()) {
+                repo.saveWorkout(DateUtils.today(), durationMin, flat)
+            }
+        }
     }
 
     companion object {

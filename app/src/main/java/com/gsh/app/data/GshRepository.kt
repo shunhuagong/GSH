@@ -28,6 +28,9 @@ class GshRepository(context: Context) {
     val dayTypeDao: DayTypeDao = db.dayTypeDao()
     val photoDao: PhotoDao = db.photoDao()
     val weightLogDao: WeightLogDao = db.weightLogDao()
+    val exerciseDao: ExerciseDao = db.exerciseDao()
+    val workoutDao: WorkoutDao = db.workoutDao()
+    val workoutSetDao: WorkoutSetDao = db.workoutSetDao()
     val settings: SettingsStore = SettingsStore(context)
     val searchHistory: SearchHistoryStore = SearchHistoryStore(context)
 
@@ -59,6 +62,41 @@ class GshRepository(context: Context) {
         if (p.weightKg != weightKg) {
             settings.updateProfile(p.copy(weightKg = weightKg))
         }
+    }
+
+    // ---------- 训练记录 ----------
+
+    /** 内置动作：只补插缺失的，不动任何已有（含自定义）动作。 */
+    suspend fun seedExercises() {
+        BUILT_IN_EXERCISES.forEach { (name, group) ->
+            if (exerciseDao.byName(name) == null) {
+                exerciseDao.insert(Exercise(name = name, muscleGroup = group, isCustom = false))
+            }
+        }
+    }
+
+    /** 新增自定义动作，返回 id（重名时返回已有 id）。 */
+    suspend fun addCustomExercise(name: String, muscleGroup: String): Long {
+        val existing = exerciseDao.byName(name)
+        if (existing != null) return existing.id
+        return exerciseDao.insert(Exercise(name = name.trim(), muscleGroup = muscleGroup, isCustom = true))
+    }
+
+    /**
+     * 上次某动作的成绩（最近一次包含它的训练里的全部组），供录入页一键带过。
+     */
+    suspend fun lastSetsOf(exerciseId: Long): List<WorkoutSet> {
+        val workout = workoutDao.lastWithExercise(exerciseId) ?: return emptyList()
+        return workoutSetDao.ofExerciseInWorkout(workout.id, exerciseId)
+    }
+
+    /** 保存一次训练：训练 + 全部组记录；并把当天标记为训练日。 */
+    suspend fun saveWorkout(date: String, durationMin: Int, sets: List<WorkoutSet>) {
+        val workoutId = workoutDao.insert(
+            Workout(date = date, durationMin = durationMin, createdAt = System.currentTimeMillis())
+        )
+        workoutSetDao.insertAll(sets.map { it.copy(id = 0, workoutId = workoutId) })
+        setDayType(date, true)
     }
 
     /**
@@ -339,6 +377,13 @@ class GshRepository(context: Context) {
     private fun fixed(value: Double): String = String.format(Locale.US, "%.1f", value)
 
     companion object {
+        /** 内置动作：用户实际训练清单，名称按用户口径 */
+        private val BUILT_IN_EXERCISES = listOf(
+            "负重深蹲" to "腿",
+            "双力臂引体器械" to "背",
+            "拉背器械" to "背"
+        )
+
         /** 照片最长边像素，超出等比压小以控制存储体积 */
         private const val MAX_PHOTO_DIMENSION = 1600
         private const val MAX_AVATAR_DIMENSION = 512
