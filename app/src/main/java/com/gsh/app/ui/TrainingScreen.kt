@@ -2,12 +2,14 @@ package com.gsh.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -139,12 +141,12 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium
                         )
-                        // 已保存的组：组号按当天入库顺序，删除后自动补位
+                        // 已保存的组：组号按当天入库顺序，删除后自动补位；行距收紧贴近饮食记录行
                         savedSets.forEachIndexed { setIndex, entry ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 2.dp),
+                                    .padding(vertical = 1.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
@@ -152,23 +154,31 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                                     fontSize = 14.sp,
                                     modifier = Modifier.weight(1f)
                                 )
-                                IconButton(onClick = { vm.deleteTrainingEntry(entry.id) }) {
-                                    Icon(Icons.Outlined.Close, contentDescription = "删除该组")
+                                IconButton(
+                                    onClick = { vm.deleteTrainingEntry(entry.id) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Close,
+                                        contentDescription = "删除该组",
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
                         }
-                        // 待填组行：点击弹录入框；组号 = 已保存组数 + 1
+                        // 待填组行：点击弹录入框；纤细文字条样式
                         if (exerciseId in pendingExercises) {
                             OutlinedButton(
                                 onClick = { entryFor = exercise to (savedSets.size + 1) },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 2.dp)
+                                    .height(34.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                             ) {
-                                Text("第 ${savedSets.size + 1} 组 · 点击填写")
+                                Text("第 ${savedSets.size + 1} 组 · 点击填写", fontSize = 13.sp)
                             }
                         }
-                        // 整行宽加组：训练手上汗/镁粉场景不易误触
+                        // 整行宽加组：训练手上汗/镁粉场景不易误触；纤细文字条样式
                         OutlinedButton(
                             onClick = {
                                 if (exerciseId !in pendingExercises) {
@@ -177,9 +187,16 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                                     entryFor = exercise to (savedSets.size + 1)
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(34.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                         ) {
-                            Text(if (savedSets.isEmpty() && exerciseId !in pendingExercises) "＋ 记第一组" else "＋ 添加一组")
+                            Text(
+                                if (savedSets.isEmpty() && exerciseId !in pendingExercises)
+                                    "＋ 记第一组" else "＋ 添加一组",
+                                fontSize = 13.sp
+                            )
                         }
                     }
                 }
