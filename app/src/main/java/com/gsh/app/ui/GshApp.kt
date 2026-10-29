@@ -124,7 +124,8 @@ fun GshApp(vm: GshViewModel = viewModel(factory = GshViewModel.Factory)) {
                         onAddClick = { mealType ->
                             navController.navigate("add?mealType=$mealType")
                         },
-                        onCopyClick = { navController.navigate("copy") }
+                        onCopyClick = { navController.navigate("copy") },
+                        onOpenTraining = { navController.navigate("training") }
                     )
                 }
                 composable("copy") {
