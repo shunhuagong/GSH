@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Food::class, MealEntry::class, DayType::class, Photo::class, WeightLog::class,
         Exercise::class, TrainingEntry::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -105,6 +105,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v7 → v8：exercises 表加 recordType 列（动作记录方式：0=重量×次数，
+         * 1=纯次数，2=计时时长，-1=未设置待推断）。单条加列，保持所有数据。
+         */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `exercises` ADD COLUMN `recordType` INTEGER NOT NULL DEFAULT -1")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -112,7 +122,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gsh.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     // 手机里已有真实数据：迁移缺失/失败必须抛错暴露，绝不静默清库重建
                     .build()
                     .also { instance = it }

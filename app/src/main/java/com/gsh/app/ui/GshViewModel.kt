@@ -51,6 +51,7 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
     init {
         viewModelScope.launch { repo.seedFoods() }
         viewModelScope.launch { repo.seedExercises() }
+        viewModelScope.launch { repo.backfillRecordTypes() }
         // 近30天没记录的天按默认训练日补账，之后统计可直接累加
         viewModelScope.launch { repo.backfillDayTypes(30) }
     }
@@ -468,35 +469,41 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         }
     }
 
-    /** 新增自定义动作，回调返回动作。 */
-    fun addCustomExercise(name: String, muscleGroup: String, onDone: (Exercise?) -> Unit) {
+    /** 新增自定义动作（带记录方式），回调返回动作。 */
+    fun addCustomExercise(name: String, muscleGroup: String, recordType: Int, onDone: (Exercise?) -> Unit) {
         if (name.isBlank()) {
             onDone(null)
             return
         }
         viewModelScope.launch {
-            val id = repo.addCustomExercise(name, muscleGroup)
-            onDone(Exercise(id = id, name = name.trim(), muscleGroup = muscleGroup, isCustom = true))
+            val id = repo.addCustomExercise(name, muscleGroup, recordType)
+            onDone(
+                Exercise(
+                    id = id, name = name.trim(),
+                    muscleGroup = muscleGroup, isCustom = true, recordType = recordType
+                )
+            )
         }
     }
 
-    /** 添加一条训练记录（器械型填重量+次数，计时型填分钟），当天自动标记训练日。 */
+    /** 添加一条训练记录；动作类型未设置（-1）时按所填组合实时判定写回。 */
     fun addTrainingEntry(
-        exerciseId: Long,
+        exercise: Exercise,
         weightKg: Double?,
         reps: Int?,
         durationMin: Int?
     ) {
         viewModelScope.launch {
-            repo.addTrainingEntry(
+            repo.addTrainingEntryAndSettleType(
                 TrainingEntry(
                     date = DateUtils.today(),
-                    exerciseId = exerciseId,
+                    exerciseId = exercise.id,
                     weightKg = weightKg,
                     reps = reps,
                     durationMin = durationMin,
                     createdAt = System.currentTimeMillis()
-                )
+                ),
+                exercise
             )
         }
     }
@@ -544,27 +551,31 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
-     * 每日聚合成一个点（口径：有重量记录→当天最好一组=重量最大、同重量次数多者；
-     * 纯次数→当天最大次数；计时→当天最长分钟），最好一组从原始记录内比较，
+     * 每日聚合成一个点：口径直接读动作 recordType（0=当天最好一组=重量最大、
+     * 同重量次数多者；1=当天最大次数；2=当天最长分钟）；-1（存量未回填的
+     * 无历史动作，不会有点）按记录字段兜底推断。最好一组从原始记录内比较，
      * 重量与次数天然来自同一组，不存在 MAX 交叉错配。
      */
     private fun aggregateProgress(exercise: Exercise, entries: List<TrainingEntry>): ProgressData? {
         if (entries.isEmpty()) return null
-        val metric = when {
-            entries.any { it.weightKg != null } -> 0   // 重量口径
-            entries.any { it.reps != null } -> 1        // 次数口径
-            else -> 2                                   // 时长口径
+        val metric = when (exercise.recordType) {
+            Exercise.TYPE_STRENGTH, Exercise.TYPE_REPS, Exercise.TYPE_DURATION -> exercise.recordType
+            else -> when {
+                entries.any { it.weightKg != null } -> Exercise.TYPE_STRENGTH
+                entries.any { it.reps != null } -> Exercise.TYPE_REPS
+                else -> Exercise.TYPE_DURATION
+            }
         }
         val points = entries.groupBy { it.date }.toSortedMap().mapNotNull { (date, list) ->
             val best = when (metric) {
-                0 -> list.filter { it.weightKg != null }
+                Exercise.TYPE_STRENGTH -> list.filter { it.weightKg != null }
                     .maxWithOrNull(compareBy({ it.weightKg!! }, { it.reps ?: 0 }))
-                1 -> list.maxByOrNull { it.reps ?: 0 }
+                Exercise.TYPE_REPS -> list.maxByOrNull { it.reps ?: 0 }
                 else -> list.maxByOrNull { it.durationMin ?: 0 }
             } ?: return@mapNotNull null
             val value = when (metric) {
-                0 -> best.weightKg!!
-                1 -> (best.reps ?: 0).toDouble()
+                Exercise.TYPE_STRENGTH -> best.weightKg!!
+                Exercise.TYPE_REPS -> (best.reps ?: 0).toDouble()
                 else -> (best.durationMin ?: 0).toDouble()
             }
             DayPoint(date, value, best.display)
@@ -590,8 +601,8 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
     }
 
     private fun metricUnit(metric: Int) = when (metric) {
-        0 -> " kg"
-        1 -> " 个"
+        Exercise.TYPE_STRENGTH -> " kg"
+        Exercise.TYPE_REPS -> " 个"
         else -> " 分钟"
     }
 

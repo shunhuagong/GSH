@@ -82,8 +82,8 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
     if (showNewExercise) {
         NewExerciseDialog(
             exercises = exercises,
-            onCreate = { name, group ->
-                vm.addCustomExercise(name, group) { created ->
+            onCreate = { name, group, recordType ->
+                vm.addCustomExercise(name, group, recordType) { created ->
                     if (created != null) {
                         showNewExercise = false
                         if (created.id !in pendingExercises) pendingExercises.add(created.id)
@@ -166,20 +166,24 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                                 }
                             }
                         }
-                        // 待填组行：点击弹录入框；纤细文字条样式
+                        // 待填组行：点击弹录入框；纤细文字条（组行为主，＋ 为辅）
                         if (exerciseId in pendingExercises) {
-                            OutlinedButton(
+                            TextButton(
                                 onClick = { entryFor = exercise to (savedSets.size + 1) },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(34.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                                    .height(30.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                             ) {
-                                Text("第 ${savedSets.size + 1} 组 · 点击填写", fontSize = 13.sp)
+                                Text(
+                                    "第 ${savedSets.size + 1} 组 · 点击填写",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
                         }
-                        // 整行宽加组：训练手上汗/镁粉场景不易误触；纤细文字条样式
-                        OutlinedButton(
+                        // 整行宽加组：无边框小字按钮
+                        TextButton(
                             onClick = {
                                 if (exerciseId !in pendingExercises) {
                                     pendingExercises.add(exerciseId)
@@ -189,13 +193,14 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(34.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                                .height(30.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                         ) {
                             Text(
                                 if (savedSets.isEmpty() && exerciseId !in pendingExercises)
                                     "＋ 记第一组" else "＋ 添加一组",
-                                fontSize = 13.sp
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -204,8 +209,12 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = { showPicker = true },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("＋ 添加训练（新动作）") }
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+            ) {
+                Text("＋ 添加训练", fontSize = 15.sp)
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -238,80 +247,127 @@ private fun SetEntryDialog(
             duration = from.durationMin?.toString() ?: ""
         }
     }
-    // 上次全是时长记录 → 计时动作：单框
-    val isDurationType = lastSets.isNotEmpty() &&
-        lastSets.all { it.weightKg == null && it.reps == null && it.durationMin != null }
 
     val w = weight.toDoubleOrNull()
     val r = reps.toIntOrNull()
     val d = duration.toIntOrNull()
-    val hasStrength = w != null && w > 0 && r != null && r > 0
-    val hasRepsOnly = weight.isBlank() && r != null && r > 0
-    val hasDuration = weight.isBlank() && reps.isBlank() && d != null && d > 0
-    val valid = hasStrength || hasRepsOnly || hasDuration
+    // 按动作 recordType 只出对应输入框与校验；-1 为存量未定类型，兼容三框
+    val type = exercise.recordType
+    val valid = when (type) {
+        Exercise.TYPE_STRENGTH -> w != null && w > 0 && r != null && r > 0
+        Exercise.TYPE_REPS -> r != null && r > 0
+        Exercise.TYPE_DURATION -> d != null && d > 0
+        else -> (w != null && w > 0 && r != null && r > 0) ||
+            (weight.isBlank() && r != null && r > 0) ||
+            (weight.isBlank() && reps.isBlank() && d != null && d > 0)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("${exercise.name} · 第 $setNo 组") },
         text = {
             Column {
-                Text(
-                    "自重动作重量可不填；计时动作只填时长",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (isDurationType) {
-                    OutlinedTextField(
-                        value = duration,
-                        onValueChange = { duration = it },
-                        label = { Text("时长") },
-                        suffix = { Text("分钟") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = weight,
-                            onValueChange = { weight = it },
-                            label = { Text("重量") },
-                            suffix = { Text("kg") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
+                when (type) {
+                    Exercise.TYPE_STRENGTH -> {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = weight,
+                                onValueChange = { weight = it },
+                                label = { Text("重量") },
+                                suffix = { Text("kg") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = reps,
+                                onValueChange = { reps = it },
+                                label = { Text("次数") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    Exercise.TYPE_REPS -> {
                         OutlinedTextField(
                             value = reps,
                             onValueChange = { reps = it },
                             label = { Text("次数") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
-                    Spacer(Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = duration,
-                        onValueChange = { duration = it },
-                        label = { Text("时长（计时动作填这个）") },
-                        suffix = { Text("分钟") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Exercise.TYPE_DURATION -> {
+                        OutlinedTextField(
+                            value = duration,
+                            onValueChange = { duration = it },
+                            label = { Text("时长") },
+                            suffix = { Text("分钟") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    else -> {
+                        // 存量未定类型：三框兼容，首次保存后类型固定
+                        Text(
+                            "自重动作重量可不填；计时动作只填时长",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = weight,
+                                onValueChange = { weight = it },
+                                label = { Text("重量") },
+                                suffix = { Text("kg") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = reps,
+                                onValueChange = { reps = it },
+                                label = { Text("次数") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = duration,
+                            onValueChange = { duration = it },
+                            label = { Text("时长（计时动作填这个）") },
+                            suffix = { Text("分钟") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    vm.addTrainingEntry(
-                        exerciseId = exercise.id,
-                        weightKg = if (hasStrength) w else null,
-                        reps = if (hasStrength || hasRepsOnly) r else null,
-                        durationMin = if (hasDuration) d else null
-                    )
+                    when (type) {
+                        Exercise.TYPE_STRENGTH -> vm.addTrainingEntry(exercise, w, r, null)
+                        Exercise.TYPE_REPS -> vm.addTrainingEntry(exercise, null, r, null)
+                        Exercise.TYPE_DURATION -> vm.addTrainingEntry(exercise, null, null, d)
+                        else -> {
+                            val hasStrength = w != null && w > 0 && r != null && r > 0
+                            val hasRepsOnly = weight.isBlank() && r != null && r > 0
+                            vm.addTrainingEntry(
+                                exercise,
+                                if (hasStrength) w else null,
+                                if (hasStrength || hasRepsOnly) r else null,
+                                if (!hasStrength && !hasRepsOnly) d else null
+                            )
+                        }
+                    }
                     onSaved()
                 },
                 enabled = valid
@@ -358,22 +414,23 @@ private fun ExerciseSelectDialog(
     )
 }
 
-/** 新建动作：独立对话框（名称 + 部位），重名提示；创建成功直接选中回到训练页。 */
+/** 新建动作：名称 + 部位 + 记录方式；重名提示；创建成功直接选中回到训练页。 */
 @Composable
 private fun NewExerciseDialog(
     exercises: List<Exercise>,
-    onCreate: (String, String) -> Unit,
+    onCreate: (String, String, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var group by remember { mutableStateOf("腿") }
+    var recordType by remember { mutableStateOf(Exercise.TYPE_STRENGTH) }
     val duplicated = exercises.any { it.name == name.trim() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("新建动作") },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -386,6 +443,7 @@ private fun NewExerciseDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(4.dp))
+                Text("部位", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("腿", "背", "胸", "肩", "臂", "核心").forEach { g ->
                         TextButton(
@@ -402,11 +460,30 @@ private fun NewExerciseDialog(
                         }
                     }
                 }
+                Text("记录方式", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                listOf(
+                    Exercise.TYPE_STRENGTH to "重量 × 次数（器械/负重，如深蹲、卧推）",
+                    Exercise.TYPE_REPS to "纯次数（自重，如俯卧撑、引体）",
+                    Exercise.TYPE_DURATION to "计时时长（如平板支撑、悬垂）"
+                ).forEach { (t, label) ->
+                    TextButton(
+                        onClick = { recordType = t },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            label,
+                            fontSize = 13.sp,
+                            color = if (recordType == t) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (recordType == t) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onCreate(name, group) },
+                onClick = { onCreate(name, group, recordType) },
                 enabled = name.isNotBlank() && !duplicated
             ) { Text("创建") }
         },

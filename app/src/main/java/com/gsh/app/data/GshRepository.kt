@@ -76,10 +76,33 @@ class GshRepository(context: Context) {
     }
 
     /** 新增自定义动作，返回 id（重名时返回已有 id）。 */
-    suspend fun addCustomExercise(name: String, muscleGroup: String): Long {
+    suspend fun addCustomExercise(name: String, muscleGroup: String, recordType: Int): Long {
         val existing = exerciseDao.byName(name)
         if (existing != null) return existing.id
-        return exerciseDao.insert(Exercise(name = name.trim(), muscleGroup = muscleGroup, isCustom = true))
+        return exerciseDao.insert(
+            Exercise(name = name.trim(), muscleGroup = muscleGroup, isCustom = true, recordType = recordType)
+        )
+    }
+
+    /**
+     * 存量动作的 recordType 一次性推断回填（启动时幂等执行）：
+     * 有历史记录的按记录类型定（重量→0 / 次数→1 / 时长→2）；没练过的不猜保持 -1。
+     */
+    suspend fun backfillRecordTypes() {
+        val metrics = trainingEntryDao.exerciseMetrics()
+        metrics.forEach { m ->
+            val type = when {
+                m.hasWeight > 0 -> Exercise.TYPE_STRENGTH
+                m.hasReps > 0 -> Exercise.TYPE_REPS
+                else -> Exercise.TYPE_DURATION
+            }
+            exerciseDao.updateRecordType(m.exerciseId, type)
+        }
+    }
+
+    /** 首次给未设置类型（-1）的动作录入后，按所填组合写回类型，永久固定。 */
+    suspend fun settleRecordType(exerciseId: Long, recordType: Int) {
+        exerciseDao.updateRecordType(exerciseId, recordType)
     }
 
     /**
@@ -96,6 +119,20 @@ class GshRepository(context: Context) {
     suspend fun addTrainingEntry(entry: TrainingEntry) {
         trainingEntryDao.insert(entry)
         setDayType(entry.date, true)
+    }
+
+    /** 添加一条训练记录；若该动作类型未设置（-1），按所填组合实时判定并写回，永久固定。 */
+    suspend fun addTrainingEntryAndSettleType(entry: TrainingEntry, exercise: Exercise) {
+        trainingEntryDao.insert(entry)
+        setDayType(entry.date, true)
+        if (exercise.recordType == Exercise.TYPE_UNSET) {
+            val type = when {
+                entry.weightKg != null -> Exercise.TYPE_STRENGTH
+                entry.reps != null -> Exercise.TYPE_REPS
+                else -> Exercise.TYPE_DURATION
+            }
+            exerciseDao.updateRecordType(exercise.id, type)
+        }
     }
 
     /**

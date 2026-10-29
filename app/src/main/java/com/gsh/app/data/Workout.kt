@@ -9,16 +9,25 @@ import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 训练动作：内置（用户实际使用的三个）+ 自定义补充。
- * 名称保留用户口径，不擅自改写。
+ * 训练动作：内置 + 自定义。
+ * recordType 在新建时规定记录方式：0=重量×次数（器械），1=纯次数（自重），
+ * 2=计时时长，-1=未设置（存量待推断；首次录入时按所填实时判定并写回，永久固定）。
  */
 @Entity(tableName = "exercises")
 data class Exercise(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val muscleGroup: String,   // 腿 / 背 / 胸 / 肩 / 臂 / 核心
-    val isCustom: Boolean = false
-)
+    val isCustom: Boolean = false,
+    val recordType: Int = -1
+) {
+    companion object {
+        const val TYPE_STRENGTH = 0   // 重量×次数
+        const val TYPE_REPS = 1        // 纯次数
+        const val TYPE_DURATION = 2    // 计时时长
+        const val TYPE_UNSET = -1      // 未设置
+    }
+}
 
 /**
  * 一条训练记录（对齐饮食记录的逐条添加模式）：
@@ -75,7 +84,18 @@ interface ExerciseDao {
 
     @Insert
     suspend fun insert(exercise: Exercise): Long
+
+    @Query("UPDATE exercises SET recordType = :recordType WHERE id = :id")
+    suspend fun updateRecordType(id: Long, recordType: Int)
 }
+
+/** 存量回填用：各动作历史记录里哪类字段非空，据此推断 recordType。 */
+data class ExerciseMetric(
+    val exerciseId: Long,
+    val hasWeight: Int,
+    val hasReps: Int,
+    val hasDuration: Int
+)
 
 @Dao
 interface TrainingEntryDao {
@@ -116,4 +136,14 @@ interface TrainingEntryDao {
     /** 各动作的记录条数（看板动作条：只列出有记录的动作，条数多的排前）。 */
     @Query("SELECT exerciseId, COUNT(*) as cnt FROM training_entries GROUP BY exerciseId ORDER BY cnt DESC")
     fun observeExerciseCounts(): Flow<List<ExerciseCount>>
+
+    /** 各动作历史记录的字段分布（recordType 存量回填推断用）。 */
+    @Query(
+        "SELECT exerciseId, " +
+            "MAX(CASE WHEN weightKg IS NOT NULL THEN 1 ELSE 0 END) as hasWeight, " +
+            "MAX(CASE WHEN reps IS NOT NULL THEN 1 ELSE 0 END) as hasReps, " +
+            "MAX(CASE WHEN durationMin IS NOT NULL THEN 1 ELSE 0 END) as hasDuration " +
+            "FROM training_entries GROUP BY exerciseId"
+    )
+    suspend fun exerciseMetrics(): List<ExerciseMetric>
 }
