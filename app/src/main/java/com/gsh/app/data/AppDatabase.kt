@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Food::class, MealEntry::class, DayType::class, Photo::class, WeightLog::class,
         Exercise::class, TrainingEntry::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -115,6 +115,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v8 → v9：时长统一改用秒——training_entries.durationMin 改名 durationSec，
+         * 存量分钟值×60 换算。先改名、后乘 60，两条语句之外不加任何改动；
+         * 不涉及饮食表。（RENAME COLUMN 需 SQLite 3.25+/较新系统，用户设备满足。）
+         */
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `training_entries` RENAME COLUMN `durationMin` TO `durationSec`")
+                db.execSQL("UPDATE `training_entries` SET `durationSec` = `durationSec` * 60 WHERE `durationSec` IS NOT NULL")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -122,7 +134,10 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gsh.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                    .addMigrations(
+                        MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+                        MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9
+                    )
                     // 手机里已有真实数据：迁移缺失/失败必须抛错暴露，绝不静默清库重建
                     .build()
                     .also { instance = it }

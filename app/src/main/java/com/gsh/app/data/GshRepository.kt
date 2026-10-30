@@ -76,12 +76,12 @@ class GshRepository(context: Context) {
         exerciseDao.renameMuscleGroup("核心", "腹")
     }
 
-    /** 新增自定义动作，返回 id（重名时返回已有 id）。 */
-    suspend fun addCustomExercise(name: String, muscleGroup: String, recordType: Int): Long {
+    /** 新增自定义动作，返回 id（重名时返回已有 id）；recordType 一律未设置（-1），首次录入时 settle。 */
+    suspend fun addCustomExercise(name: String, muscleGroup: String): Long {
         val existing = exerciseDao.byName(name)
         if (existing != null) return existing.id
         return exerciseDao.insert(
-            Exercise(name = name.trim(), muscleGroup = muscleGroup, isCustom = true, recordType = recordType)
+            Exercise(name = name.trim(), muscleGroup = muscleGroup, isCustom = true)
         )
     }
 

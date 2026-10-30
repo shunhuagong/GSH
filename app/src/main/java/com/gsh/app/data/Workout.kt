@@ -38,7 +38,7 @@ data class Exercise(
 
 /**
  * 一条训练记录（对齐饮食记录的逐条添加模式）：
- * 器械组次型填重量+次数；计时型动作（平板支撑/跑步等）填时长分钟。
+ * 器械组次型填重量+次数；计时型（平板支撑等）填时长秒。
  * 同一天的若干条 = 一次训练。
  */
 @Entity(
@@ -51,15 +51,15 @@ data class TrainingEntry(
     val exerciseId: Long,
     val weightKg: Double?,      // 器械型：重量
     val reps: Int?,            // 器械型：次数
-    val durationMin: Int?,      // 计时型：时长（分钟）
+    val durationSec: Int?,     // 计时型：时长（秒）
     val createdAt: Long
 ) {
-    /** 列表显示文案："60 kg × 12" / "20 个"（纯次数）/ "15 分钟" */
+    /** 列表显示文案："60 kg × 12" / "20 个"（纯次数）/ "180 秒" */
     val display: String
         get() = when {
             weightKg != null && reps != null -> trimNum(weightKg) + " kg × $reps"
             reps != null -> "$reps 个"
-            durationMin != null -> "$durationMin 分钟"
+            durationSec != null -> "$durationSec 秒"
             else -> ""
         }
 }
@@ -151,7 +151,7 @@ interface TrainingEntryDao {
         "SELECT exerciseId, " +
             "MAX(CASE WHEN weightKg IS NOT NULL THEN 1 ELSE 0 END) as hasWeight, " +
             "MAX(CASE WHEN reps IS NOT NULL THEN 1 ELSE 0 END) as hasReps, " +
-            "MAX(CASE WHEN durationMin IS NOT NULL THEN 1 ELSE 0 END) as hasDuration " +
+            "MAX(CASE WHEN durationSec IS NOT NULL THEN 1 ELSE 0 END) as hasDuration " +
             "FROM training_entries GROUP BY exerciseId"
     )
     suspend fun exerciseMetrics(): List<ExerciseMetric>

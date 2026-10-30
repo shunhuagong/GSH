@@ -114,8 +114,8 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
     if (showNewExercise) {
         NewExerciseDialog(
             exercises = exercises,
-            onCreate = { name, group, recordType ->
-                vm.addCustomExercise(name, group, recordType) { created ->
+            onCreate = { name, muscleGroup ->
+                vm.addCustomExercise(name, muscleGroup) { created ->
                     if (created != null) {
                         showNewExercise = false
                         addPendingRow(created.id)
@@ -345,16 +345,15 @@ private fun ExerciseSelectDialog(
     )
 }
 
-/** 新建动作：名称 + 部位 + 记录方式；重名提示；创建成功直接选中回到训练页。 */
+/** 新建动作：名称 + 多选部位；重名提示；创建成功直接选中回到训练页（记录方式一律未设置，录入框统一三框）。 */
 @Composable
 private fun NewExerciseDialog(
     exercises: List<Exercise>,
-    onCreate: (String, String, Int) -> Unit,
+    onCreate: (String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     val selectedGroups = remember { mutableStateListOf<String>() }
-    var recordType by remember { mutableStateOf(Exercise.TYPE_STRENGTH) }
     val duplicated = exercises.any { it.name == name.trim() }
 
     AlertDialog(
@@ -386,25 +385,6 @@ private fun NewExerciseDialog(
                         )
                     }
                 }
-                Text("记录方式", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                listOf(
-                    Exercise.TYPE_STRENGTH to "重量 × 次数（器械/负重，如深蹲、卧推）",
-                    Exercise.TYPE_REPS to "纯次数（自重，如俯卧撑、引体）",
-                    Exercise.TYPE_DURATION to "计时时长（如平板支撑、悬垂）"
-                ).forEach { (t, label) ->
-                    TextButton(
-                        onClick = { recordType = t },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            label,
-                            fontSize = 13.sp,
-                            color = if (recordType == t) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (recordType == t) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
             }
         },
         confirmButton = {
@@ -413,8 +393,7 @@ private fun NewExerciseDialog(
                     // 已选多标签按固定类别表顺序逗号拼接（如"腿,背"）
                     onCreate(
                         name,
-                        Exercise.GROUPS.filter { it in selectedGroups }.joinToString(","),
-                        recordType
+                        Exercise.GROUPS.filter { it in selectedGroups }.joinToString(",")
                     )
                 },
                 enabled = name.isNotBlank() && !duplicated && selectedGroups.isNotEmpty()
@@ -451,31 +430,23 @@ private fun MuscleTagChip(label: String, selected: Boolean, onClick: () -> Unit)
     )
 }
 
-/** 待填组行：页面状态，重量/次数/时长的行内输入草稿。 */
+/** 待填组行：页面状态，重量/次数/秒的行内输入草稿。 */
 private class PendingRow(val exerciseId: Long) {
     var weight by mutableStateOf("")
     var reps by mutableStateOf("")
     var duration by mutableStateOf("")
 }
 
-/** 按 recordType 校验待填行；合法返回 (weight, reps, duration)，否则 null。 */
-private fun parsePending(row: PendingRow, recordType: Int): Triple<Double?, Int?, Int?>? {
+/** 待填行三选一校验：kg+次 / 只次 / 只秒；kg+秒、次+秒、三框全填、全空均为非法（✓ 灰）。 */
+private fun parsePending(row: PendingRow): Triple<Double?, Int?, Int?>? {
     val w = row.weight.toDoubleOrNull()
     val r = row.reps.toIntOrNull()
     val d = row.duration.toIntOrNull()
-    return when (recordType) {
-        Exercise.TYPE_STRENGTH ->
-            if (w != null && w > 0 && r != null && r > 0) Triple(w, r, null) else null
-        Exercise.TYPE_REPS ->
-            if (r != null && r > 0) Triple(null, r, null) else null
-        Exercise.TYPE_DURATION ->
-            if (d != null && d > 0) Triple(null, null, d) else null
-        else -> when {
-            w != null && w > 0 && r != null && r > 0 -> Triple(w, r, null)
-            row.weight.isBlank() && r != null && r > 0 -> Triple(null, r, null)
-            row.weight.isBlank() && row.reps.isBlank() && d != null && d > 0 -> Triple(null, null, d)
-            else -> null
-        }
+    return when {
+        w != null && w > 0 && r != null && r > 0 -> Triple(w, r, null)
+        row.weight.isBlank() && r != null && r > 0 -> Triple(null, r, null)
+        row.weight.isBlank() && row.reps.isBlank() && d != null && d > 0 -> Triple(null, null, d)
+        else -> null
     }
 }
 
@@ -493,18 +464,17 @@ private fun PendingRowInline(
     onSaved: () -> Unit,
     onDiscard: () -> Unit
 ) {
-    // 行出现时预填上次第 N 组（不足带上一组，无历史留空）
+    // 行出现时预填上次第 N 组（不足带上一组，无历史留空）；时长迁移后已是秒，无需换算
     LaunchedEffect(row) {
         val last = vm.lastSetsOf(exercise.id)
         val from = last.getOrNull(setNo - 1) ?: last.lastOrNull()
         if (from != null) {
             row.weight = from.weightKg?.let { trimNum(it) } ?: ""
             row.reps = from.reps?.toString() ?: ""
-            row.duration = from.durationMin?.toString() ?: ""
+            row.duration = from.durationSec?.toString() ?: ""
         }
     }
-    val type = exercise.recordType
-    val parsed = parsePending(row, type)
+    val parsed = parsePending(row)
 
     Row(
         modifier = Modifier
@@ -524,26 +494,12 @@ private fun PendingRowInline(
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(horizontal = 6.dp, vertical = 4.dp)
         )
-        when (type) {
-            Exercise.TYPE_STRENGTH -> {
-                InlineNumField(row.weight, { row.weight = it }, "kg", KeyboardType.Decimal, Modifier.width(72.dp))
-                InlineNumField(row.reps, { row.reps = it }, "次", KeyboardType.Number, Modifier.width(56.dp))
-                Spacer(Modifier.weight(1f))
-            }
-            Exercise.TYPE_REPS -> {
-                InlineNumField(row.reps, { row.reps = it }, "次", KeyboardType.Number, Modifier.weight(1f))
-            }
-            Exercise.TYPE_DURATION -> {
-                InlineNumField(row.duration, { row.duration = it }, "分钟", KeyboardType.Number, Modifier.weight(1f))
-            }
-            else -> {
-                // 存量未定类型：三框兼容，首次保存后类型固定
-                InlineNumField(row.weight, { row.weight = it }, "kg", KeyboardType.Decimal, Modifier.width(72.dp))
-                InlineNumField(row.reps, { row.reps = it }, "次", KeyboardType.Number, Modifier.width(56.dp))
-                InlineNumField(row.duration, { row.duration = it }, "分钟", KeyboardType.Number, Modifier.width(64.dp))
-                Spacer(Modifier.weight(1f))
-            }
-        }
+        // 所有动作统一三框：kg + 次 + 秒——填什么按什么判定（三选一），
+        // 不再按 recordType 出框；recordType 只剩看板口径
+        InlineNumField(row.weight, { row.weight = it }, "kg", KeyboardType.Decimal, Modifier.width(72.dp))
+        InlineNumField(row.reps, { row.reps = it }, "次", KeyboardType.Number, Modifier.width(56.dp))
+        InlineNumField(row.duration, { row.duration = it }, "秒", KeyboardType.Number, Modifier.width(64.dp))
+        Spacer(Modifier.weight(1f))
         // ✕ 取消 + ✓ 保存：钉在行右缘，与已保存行垃圾桶同一竖线，两按钮间 4dp
         Row(
             verticalAlignment = Alignment.CenterVertically,
