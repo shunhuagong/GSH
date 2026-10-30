@@ -28,14 +28,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gsh.app.ai.AiUiState
-import com.gsh.app.data.DailyTotal
 import com.gsh.app.data.DateUtils
 import com.gsh.app.data.NutritionTargets
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(vm: GshViewModel, onDayClick: (String) -> Unit) {
-    val totals by vm.dailyTotals.collectAsState()
+    val days by vm.historyDays.collectAsState()
     val profile by vm.profile.collectAsState()
     val dayTypes by vm.dayTypes.collectAsState()
     val weeklyReport by vm.weeklyReport.collectAsState()
@@ -50,7 +49,8 @@ fun HistoryScreen(vm: GshViewModel, onDayClick: (String) -> Unit) {
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(title = { Text("历史记录") })
-        if (totals.isNotEmpty()) {
+        // AI 周报基于饮食数据，有饮食记录的日子才出按钮
+        if (days.any { it.total != null }) {
             OutlinedButton(
                 onClick = vm::requestWeeklyReport,
                 modifier = Modifier
@@ -60,7 +60,7 @@ fun HistoryScreen(vm: GshViewModel, onDayClick: (String) -> Unit) {
                 Text("🤖 生成近7天 AI 周报")
             }
         }
-        if (totals.isEmpty()) {
+        if (days.isEmpty()) {
             Text(
                 text = "还没有历史记录，先去记录今天吃了什么吧",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -71,13 +71,13 @@ fun HistoryScreen(vm: GshViewModel, onDayClick: (String) -> Unit) {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(totals, key = { it.date }) { total ->
-                    val isTraining = dayTypes[total.date] ?: true
+                items(days, key = { it.date }) { day ->
+                    val isTraining = dayTypes[day.date] ?: true
                     DailyTotalCard(
-                        total = total,
+                        day = day,
                         isTraining = isTraining,
                         targets = NutritionTargets.from(profile, isTraining),
-                        onClick = { onDayClick(total.date) },
+                        onClick = { onDayClick(day.date) },
                         modifier = Modifier.animateItem()
                     )
                 }
@@ -88,7 +88,7 @@ fun HistoryScreen(vm: GshViewModel, onDayClick: (String) -> Unit) {
 
 @Composable
 private fun DailyTotalCard(
-    total: DailyTotal,
+    day: GshViewModel.HistoryDay,
     isTraining: Boolean,
     targets: NutritionTargets,
     onClick: () -> Unit,
@@ -105,7 +105,7 @@ private fun DailyTotalCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = DateUtils.display(total.date),
+                    text = DateUtils.display(day.date),
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f)
@@ -118,19 +118,37 @@ private fun DailyTotalCard(
                 )
             }
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = "蛋白 %.1f g · 碳水 %.1f g · 脂肪 %.1f g · %.0f kcal".format(
-                    total.protein, total.carbs, total.fat, total.calories
-                ),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            MiniBar("蛋白", total.protein, targets.protein, ProteinColor)
-            Spacer(Modifier.height(4.dp))
-            MiniBar("碳水", total.carbs, targets.carbs, CarbsColor)
-            Spacer(Modifier.height(4.dp))
-            MiniBar("脂肪", total.fat, targets.fat, FatColor)
+            val total = day.total
+            if (total != null) {
+                Text(
+                    text = "蛋白 %.1f g · 碳水 %.1f g · 脂肪 %.1f g · %.0f kcal".format(
+                        total.protein, total.carbs, total.fat, total.calories
+                    ),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                MiniBar("蛋白", total.protein, targets.protein, ProteinColor)
+                Spacer(Modifier.height(4.dp))
+                MiniBar("碳水", total.carbs, targets.carbs, CarbsColor)
+                Spacer(Modifier.height(4.dp))
+                MiniBar("脂肪", total.fat, targets.fat, FatColor)
+            } else {
+                // 只练了没吃的日子：营养行显示"—"
+                Text(
+                    text = "—",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (day.training.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "🏋️ " + day.training.joinToString(" · ") { "${it.first} ${it.second} 组" },
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

@@ -443,6 +443,32 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         repo.trainingEntryDao.observeLatestSummary()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** 历史页每日训练摘要：date -> （动作名 to 组数），同日内组数多者在前。 */
+    val dailyTrainingSummaries: StateFlow<Map<String, List<Pair<String, Int>>>> =
+        combine(repo.trainingEntryDao.observeDailyExerciseCounts(), exercises) { counts, exs ->
+            counts.groupBy { it.date }.mapValues { (_, list) ->
+                list.mapNotNull { c ->
+                    exs.find { it.id == c.exerciseId }?.let { it.name to c.cnt }
+                }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** 历史页列表项：饮食汇总（可能无）+ 训练摘要。 */
+    data class HistoryDay(
+        val date: String,
+        val total: DailyTotal?,               // null = 当天没记饮食（只练了没吃）
+        val training: List<Pair<String, Int>>  // (动作名, 组数)，组数多者在前
+    )
+
+    /** 历史列表 = 有饮食 ∨ 有训练 的日期并集（日期新在前），只练没吃的日子不再隐身。 */
+    val historyDays: StateFlow<List<HistoryDay>> =
+        combine(dailyTotals, dailyTrainingSummaries) { totals, training ->
+            val totalByDate = totals.associateBy { it.date }
+            (totalByDate.keys + training.keys).distinct().sortedDescending().map { date ->
+                HistoryDay(date, totalByDate[date], training[date] ?: emptyList())
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     /** 上次某动作的全部组（第 N 组带上次第 N 组；只看选中日期之前，不含当天）。 */
     suspend fun lastSetsOf(exerciseId: Long): List<TrainingEntry> =
         repo.lastSetsOf(exerciseId, _selectedDate.value)

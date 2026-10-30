@@ -77,6 +77,13 @@ data class ExerciseCount(
     val cnt: Int
 )
 
+/** 历史页训练摘要行：某日某动作的组数（整表一次聚合查询，避免逐日 N+1）。 */
+data class DailyExerciseCount(
+    val date: String,
+    val exerciseId: Long,
+    val cnt: Int
+)
+
 private fun trimNum(value: Double): String =
     if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
 
@@ -145,6 +152,13 @@ interface TrainingEntryDao {
     /** 各动作的记录条数（看板动作条：只列出有记录的动作，条数多的排前）。 */
     @Query("SELECT exerciseId, COUNT(*) as cnt FROM training_entries GROUP BY exerciseId ORDER BY cnt DESC")
     fun observeExerciseCounts(): Flow<List<ExerciseCount>>
+
+    /** 各训练日按动作聚合的组数（历史页摘要行：日期新在前，同日内组数多者在前）。 */
+    @Query(
+        "SELECT date, exerciseId, COUNT(*) as cnt FROM training_entries " +
+            "GROUP BY date, exerciseId ORDER BY date DESC, cnt DESC"
+    )
+    fun observeDailyExerciseCounts(): Flow<List<DailyExerciseCount>>
 
     /** 各动作历史记录的字段分布（recordType 存量回填推断用）。 */
     @Query(
