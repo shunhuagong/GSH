@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -90,6 +91,7 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
     val collapsedIds = remember { mutableStateListOf<Long>() }
     var showPicker by remember { mutableStateOf(false) }
     var showNewExercise by remember { mutableStateOf(false) }
+    var editTarget by remember { mutableStateOf<Exercise?>(null) }
 
     fun addPendingRow(exerciseId: Long) {
         if (pendingRows.none { it.exerciseId == exerciseId }) {
@@ -108,7 +110,21 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                 showPicker = false
                 showNewExercise = true
             },
+            onEdit = { editTarget = it },
             onDismiss = { showPicker = false }
+        )
+    }
+
+    // 编辑动作叠在选择对话框上：保存后列表即时刷新新名/新标签，可当场核对归类
+    editTarget?.let { target ->
+        EditExerciseDialog(
+            exercise = target,
+            exercises = exercises,
+            onSave = { name, muscleGroup ->
+                vm.updateExercise(target.id, name, muscleGroup)
+                editTarget = null
+            },
+            onDismiss = { editTarget = null }
         )
     }
 
@@ -299,6 +315,7 @@ private fun ExerciseSelectDialog(
     exercises: List<Exercise>,
     onPick: (Exercise?) -> Unit,
     onNewExercise: () -> Unit,
+    onEdit: (Exercise) -> Unit,
     onDismiss: () -> Unit
 ) {
     var selectedGroup by remember { mutableStateOf("全部") }
@@ -367,11 +384,24 @@ private fun ExerciseSelectDialog(
                             )
                         }
                         shown.forEach { e ->
-                            TextButton(
-                                onClick = { onPick(e) },
-                                modifier = Modifier.fillMaxWidth()
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(e.name, fontSize = 15.sp)
+                                // 行身 = 选动作；行尾 ✎ = 编辑动作（不抢点击）
+                                TextButton(
+                                    onClick = { onPick(e) },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(e.name, fontSize = 15.sp)
+                                }
+                                IconButton(onClick = { onEdit(e) }) {
+                                    Icon(
+                                        Icons.Outlined.Edit,
+                                        contentDescription = "编辑动作",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
@@ -443,6 +473,71 @@ private fun NewExerciseDialog(
                 },
                 enabled = name.isNotBlank() && !duplicated && selectedGroups.isNotEmpty()
             ) { Text("创建") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
+}
+
+/**
+ * 编辑动作：改名称与部位多选标签（至少一个；重名校验排除自身）。
+ * recordType 已由历史定型、看板口径依赖，不可改也不显示。保存后
+ * exercises Flow 自动刷新，今日页/历史摘要/看板引用式显示新名。
+ */
+@Composable
+private fun EditExerciseDialog(
+    exercise: Exercise,
+    exercises: List<Exercise>,
+    onSave: (String, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf(exercise.name) }
+    val selectedGroups = remember { mutableStateListOf<String>().apply { addAll(exercise.muscleTags) } }
+    val duplicated = exercises.any { it.name == name.trim() && it.id != exercise.id }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("编辑动作") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("动作名称") },
+                    isError = duplicated,
+                    supportingText = {
+                        if (duplicated) Text("已存在同名动作")
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(4.dp))
+                Text("部位", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(Exercise.GROUPS) { g ->
+                        MuscleTagChip(
+                            label = g,
+                            selected = g in selectedGroups,
+                            onClick = {
+                                if (g in selectedGroups) selectedGroups.remove(g) else selectedGroups.add(g)
+                            }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    // 已选多标签按固定类别表顺序逗号拼接（如"腿,背"）
+                    onSave(
+                        name.trim(),
+                        Exercise.GROUPS.filter { it in selectedGroups }.joinToString(",")
+                    )
+                },
+                enabled = name.isNotBlank() && !duplicated && selectedGroups.isNotEmpty()
+            ) { Text("保存") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("取消") }

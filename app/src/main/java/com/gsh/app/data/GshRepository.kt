@@ -85,6 +85,11 @@ class GshRepository(context: Context) {
         )
     }
 
+    /** 编辑动作名称与部位标签；training_entries 只存 exerciseId，今日页/历史摘要/看板引用式显示新名。 */
+    suspend fun updateExercise(id: Long, name: String, muscleGroup: String) {
+        exerciseDao.update(id, name, muscleGroup)
+    }
+
     /**
      * 存量动作的 recordType 一次性推断回填（启动时幂等执行）：
      * 有历史记录的按记录类型定（重量→0 / 次数→1 / 时长→2）；没练过的不猜保持 -1。

@@ -490,6 +490,11 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         }
     }
 
+    /** 编辑动作名称与部位标签；exercises Flow 自动刷新，各处展示引用式跟随新名，历史训练行不动。 */
+    fun updateExercise(id: Long, name: String, muscleGroup: String) {
+        viewModelScope.launch { repo.updateExercise(id, name, muscleGroup) }
+    }
+
     /** 添加一条训练记录（落在正在查看的日期）；动作类型未设置时按所填组合实时判定写回。 */
     fun addTrainingEntry(
         exercise: Exercise,

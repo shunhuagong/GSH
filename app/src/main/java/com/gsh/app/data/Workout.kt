@@ -105,6 +105,10 @@ interface ExerciseDao {
 
     @Query("UPDATE exercises SET recordType = :recordType WHERE id = :id")
     suspend fun updateRecordType(id: Long, recordType: Int)
+
+    /** 编辑动作名称与部位标签（不动 isCustom/recordType；历史记录只存 id，引用式跟随新名）。 */
+    @Query("UPDATE exercises SET name = :name, muscleGroup = :muscleGroup WHERE id = :id")
+    suspend fun update(id: Long, name: String, muscleGroup: String)
 }
 
 /** 存量回填用：各动作历史记录里哪类字段非空，据此推断 recordType。 */
