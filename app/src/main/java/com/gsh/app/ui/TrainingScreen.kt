@@ -239,11 +239,9 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                                         exercise = exercise,
                                         row = row,
                                         setNo = savedSets.size + 1,
-                                        onSaved = {
-                                            pendingRows.remove(row)
-                                            // 下一待填行自动出现（预填上次第 N+1 组）
-                                            addPendingRow(exerciseId)
-                                        }
+                                        // 保存即加入完成：待填行移除变已保存样式，不自动出现
+                                        // 下一待填行，练下一组由用户自己点「＋ 加一组」
+                                        onSaved = { pendingRows.remove(row) }
                                     )
                                 }
                                 // 无边框小胶囊加组：当前行合法先存，再出现下一行
