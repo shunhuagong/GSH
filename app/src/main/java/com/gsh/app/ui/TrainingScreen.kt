@@ -29,7 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -225,7 +225,7 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                                             modifier = Modifier.size(32.dp)
                                         ) {
                                             Icon(
-                                                Icons.Outlined.Close,
+                                                Icons.Outlined.Delete,
                                                 contentDescription = "删除该组",
                                                 modifier = Modifier.size(18.dp)
                                             )
