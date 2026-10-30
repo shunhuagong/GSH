@@ -9,6 +9,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -58,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -178,7 +182,7 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                                 )
                                 if (collapsed) {
                                     Text(
-                                        "（${exercise.muscleGroup}） · ${savedSets.size} 组",
+                                        "（${exercise.muscleTags.joinToString("·")}） · ${savedSets.size} 组",
                                         fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -284,7 +288,7 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
         }
     }
 }
-/** 动作选择：只放列表；底部整行宽「＋ 新建动作」入口。 */
+/** 动作选择：顶部部位类别条（默认"全部"）+ 只显示动作名的列表；底部整行宽「＋ 新建动作」入口。 */
 @Composable
 private fun ExerciseSelectDialog(
     exercises: List<Exercise>,
@@ -292,17 +296,39 @@ private fun ExerciseSelectDialog(
     onNewExercise: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var selectedGroup by remember { mutableStateOf("全部") }
+    val shown = if (selectedGroup == "全部") exercises
+    else exercises.filter { selectedGroup in it.muscleTags }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("选择动作") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                exercises.forEach { e ->
+                // 部位类别条：点类别只显示带该标签的动作，多标签动作在多个类别下都出现
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(listOf("全部") + Exercise.GROUPS) { g ->
+                        FilterChip(
+                            selected = selectedGroup == g,
+                            onClick = { selectedGroup = g },
+                            label = { Text(g) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                if (shown.isEmpty()) {
+                    Text(
+                        "该部位还没有动作",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 12.dp)
+                    )
+                }
+                shown.forEach { e ->
                     TextButton(
                         onClick = { onPick(e) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("${e.name}（${e.muscleGroup}）", fontSize = 15.sp)
+                        Text(e.name, fontSize = 15.sp)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -327,7 +353,7 @@ private fun NewExerciseDialog(
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
-    var group by remember { mutableStateOf("腿") }
+    val selectedGroups = remember { mutableStateListOf<String>() }
     var recordType by remember { mutableStateOf(Exercise.TYPE_STRENGTH) }
     val duplicated = exercises.any { it.name == name.trim() }
 
@@ -349,20 +375,15 @@ private fun NewExerciseDialog(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text("部位", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("腿", "背", "胸", "肩", "臂", "核心").forEach { g ->
-                        TextButton(
-                            onClick = { group = g },
-                            modifier = Modifier.padding(0.dp)
-                        ) {
-                            Text(
-                                g,
-                                fontSize = 13.sp,
-                                color = if (group == g) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = if (group == g) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(Exercise.GROUPS) { g ->
+                        MuscleTagChip(
+                            label = g,
+                            selected = g in selectedGroups,
+                            onClick = {
+                                if (g in selectedGroups) selectedGroups.remove(g) else selectedGroups.add(g)
+                            }
+                        )
                     }
                 }
                 Text("记录方式", fontWeight = FontWeight.Bold, fontSize = 13.sp)
@@ -388,13 +409,45 @@ private fun NewExerciseDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onCreate(name, group, recordType) },
-                enabled = name.isNotBlank() && !duplicated
+                onClick = {
+                    // 已选多标签按固定类别表顺序逗号拼接（如"腿,背"）
+                    onCreate(
+                        name,
+                        Exercise.GROUPS.filter { it in selectedGroups }.joinToString(","),
+                        recordType
+                    )
+                },
+                enabled = name.isNotBlank() && !duplicated && selectedGroups.isNotEmpty()
             ) { Text("创建") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("取消") }
         }
+    )
+}
+
+/** 部位多选 chip：选中=主题色淡底(10%)+描边（用户要的"阴影/填充"感），未选中灰字无边框。 */
+@Composable
+private fun MuscleTagChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        label,
+        fontSize = 13.sp,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        color = if (selected) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                else Color.Transparent
+            )
+            .border(
+                1.dp,
+                if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                RoundedCornerShape(8.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
     )
 }
 

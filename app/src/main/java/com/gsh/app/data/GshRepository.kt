@@ -66,13 +66,14 @@ class GshRepository(context: Context) {
 
     // ---------- 训练记录 ----------
 
-    /** 内置动作：只补插缺失的，不动任何已有（含自定义）动作。 */
+    /** 内置动作：只补插缺失的，不动任何已有（含自定义）动作；"核心"存量口径同步改"腹"（幂等）。 */
     suspend fun seedExercises() {
         BUILT_IN_EXERCISES.forEach { (name, group) ->
             if (exerciseDao.byName(name) == null) {
                 exerciseDao.insert(Exercise(name = name, muscleGroup = group, isCustom = false))
             }
         }
+        exerciseDao.renameMuscleGroup("核心", "腹")
     }
 
     /** 新增自定义动作，返回 id（重名时返回已有 id）。 */

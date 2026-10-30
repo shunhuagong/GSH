@@ -10,18 +10,25 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * 训练动作：内置 + 自定义。
- * recordType 在新建时规定记录方式：0=重量×次数（器械），1=纯次数（自重），
- * 2=计时时长，-1=未设置（存量待推断；首次录入时按所填实时判定并写回，永久固定）。
+ * muscleGroup 为逗号分隔的多部位标签（如"腿,背"），单标签即单元素，向后兼容。
+ * recordType：0=重量×次数，1=纯次数，2=计时时长，-1=未设置——只影响看板口径，
+ * 录入框不随类型变化（统一三框）；首次录入按所填组合 settle，永久固定。
  */
 @Entity(tableName = "exercises")
 data class Exercise(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
-    val muscleGroup: String,   // 腿 / 背 / 胸 / 肩 / 臂 / 核心
+    val muscleGroup: String,   // 逗号分隔：腿 / 背 / 胸 / 肩 / 臂 / 腹
     val isCustom: Boolean = false,
     val recordType: Int = -1
 ) {
+    /** 多部位标签列表（过滤空段，单标签动作即单元素）。 */
+    val muscleTags: List<String>
+        get() = muscleGroup.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+
     companion object {
+        /** 固定部位类别表（顺序即多标签拼接顺序）；原"核心"口径已统一为"腹"。 */
+        val GROUPS = listOf("腿", "背", "胸", "肩", "臂", "腹")
         const val TYPE_STRENGTH = 0   // 重量×次数
         const val TYPE_REPS = 1        // 纯次数
         const val TYPE_DURATION = 2    // 计时时长
@@ -84,6 +91,10 @@ interface ExerciseDao {
 
     @Insert
     suspend fun insert(exercise: Exercise): Long
+
+    /** 部位口径统一（幂等）：把旧口径标签批量改名，如"核心"→"腹"。 */
+    @Query("UPDATE exercises SET muscleGroup = :to WHERE muscleGroup = :from")
+    suspend fun renameMuscleGroup(from: String, to: String)
 
     @Query("UPDATE exercises SET recordType = :recordType WHERE id = :id")
     suspend fun updateRecordType(id: Long, recordType: Int)
