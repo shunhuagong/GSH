@@ -8,7 +8,7 @@
 记录饮食 → 换算蛋白/碳水/脂肪 → 与"体重×每公斤系数"的目标对比 → AI 分析。
 
 - 语言/UI：Kotlin 2.0.21 + Jetpack Compose（Material 3，BOM 2024.12.01）
-- 数据：Room（`gsh.db`，version 7）+ SharedPreferences（SettingsStore）
+- 数据：Room（`gsh.db`，version 8）+ SharedPreferences（SettingsStore）
 - 构建：Gradle 8.11.1 / AGP 8.7.3，compileSdk 35，minSdk 26，Java 17
 - 当前版本：versionName 2.1 / versionCode 12
 
@@ -102,6 +102,6 @@ ui/
 | v1.8 (code 9) | 设置页身体信息扩展：性别/身高/年龄（选填；年龄输入、内部按出生年存储自动增长）；健康指标卡片（BMI 中国标准分级 + 健康体重范围 + Mifflin-St Jeor 基础代谢）；AI prompt 与 JSON 导出带上身体信息；修复系数显示浮点精度尾巴（0.8 读回 0.800000011…） |
 | v1.9 (code 10) | 新增「我」页（原设置 tab 改造）：头像（默认插画，+ 角标相册换图）+ 设置改为「我」页齿轮进入的二级页；健康指标卡从设置页移至「我」页（后又随极简化移除）；头像裁剪界面（Canvas 直绘、捏合锚定图片中心、EXIF/透明底/纯色底板处理） |
 | v2.0 (code 11) | 「我」页成型：极简头部（头像+齿轮）+ 🔥近30天成绩（饮食打卡/蛋白达标/训练日，训练日口径=未标记即训练日）+ ⚖️体重历史（Room v4→v5 新增 weight_logs 显式迁移；当前体重+较上次变化+近90天 Canvas 折线+记录弹窗，记录同步更新营养目标） |
-| v2.1 (code 12) | 训练记录上线（Room v5→v6→v7，现 training_entries 单表逐条模式，对齐饮食交互）：**多组录入卡片**（点添加先选动作→该动作多组卡片，整行宽加组、第N组带上次第N组、保存全部原子入库/取消零残留，支持纯次数/纯时长/计时动作自动切单框）；展示带组号（第N组）+今日页"N 组"摘要；📈训练进步看板（二级页：动作chips+🏆历史最好+较上次变化+🔥新纪录+近90天最好一组折线）；修复路由崩溃（workout→training）；移除 fallbackToDestructiveMigration（迁移链 2→7 全显式，失败抛错不清库） |
+| v2.1 (code 12) | 训练记录上线（Room v5→v6→v7→v8，现 training_entries 单表逐条模式，对齐饮食交互）：页面长组模式（选完动作落训练页卡片，点组行就地录入逐组入库、＋加组无边框文字条、空卡离开丢弃、上次第N组预填）；动作选择器只列表+独立新建界面（重名提示、必选记录方式 recordType，录入只出对应输入框、存量按历史推断回填/首次录入固定）；纯次数/纯时长支持；📈训练进步看板（动作chips+🏆历史最好+较上次变化+🔥新纪录+近90天最好一组折线）；修复路由崩溃；移除 fallbackToDestructiveMigration |
 
 （2026-10-16 之后的功能改动请追加到本表）
