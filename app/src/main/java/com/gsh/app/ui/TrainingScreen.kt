@@ -388,18 +388,22 @@ private fun ExerciseSelectDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // 行身 = 选动作；行尾 ✎ = 编辑动作（不抢点击）
+                                // 行身 = 选动作；行尾 ✎ = 编辑动作（16dp 小图标弱化存在感，32dp 热区防误触）
                                 TextButton(
                                     onClick = { onPick(e) },
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Text(e.name, fontSize = 15.sp)
                                 }
-                                IconButton(onClick = { onEdit(e) }) {
+                                IconButton(
+                                    onClick = { onEdit(e) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
                                     Icon(
                                         Icons.Outlined.Edit,
                                         contentDescription = "编辑动作",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
