@@ -106,20 +106,12 @@ class GshRepository(context: Context) {
     }
 
     /**
-     * 上次某动作的最近一条记录（重量/次数/时长），录入表单"上次带过"用。
+     * 上次某动作的全部组（多组录入的"第 N 组带上次第 N 组"用）。
+     * before 为当前查看日期：严格取其之前最近的一个训练日（不含当天），
+     * 补录过去日期、以及当天连续加组都不被当天/其后的记录污染。
      */
-    suspend fun lastEntryOf(exerciseId: Long): TrainingEntry? =
-        trainingEntryDao.lastOf(exerciseId)
-
-    /** 上次某动作的全部组（多组录入的"第 N 组带上次第 N 组"用）。 */
-    suspend fun lastSetsOf(exerciseId: Long): List<TrainingEntry> =
-        trainingEntryDao.lastSetsOf(exerciseId)
-
-    /** 添加一条训练记录，并把当天标记为训练日。 */
-    suspend fun addTrainingEntry(entry: TrainingEntry) {
-        trainingEntryDao.insert(entry)
-        setDayType(entry.date, true)
-    }
+    suspend fun lastSetsOf(exerciseId: Long, before: String): List<TrainingEntry> =
+        trainingEntryDao.lastSetsOfBefore(exerciseId, before)
 
     /** 添加一条训练记录；若该动作类型未设置（-1），按所填组合实时判定并写回，永久固定。 */
     suspend fun addTrainingEntryAndSettleType(entry: TrainingEntry, exercise: Exercise) {
@@ -133,15 +125,6 @@ class GshRepository(context: Context) {
             }
             exerciseDao.updateRecordType(exercise.id, type)
         }
-    }
-
-    /**
-     * 多组卡片原子保存：全部条目一个事务入库（失败整体回滚、不留半截），
-     * 成功后当天标记为训练日。取消不调用本方法，自然零残留。
-     */
-    suspend fun saveTrainingEntries(entries: List<TrainingEntry>) = db.withTransaction {
-        trainingEntryDao.insertAll(entries)
-        entries.firstOrNull()?.let { setDayType(it.date, true) }
     }
 
     /** 删除一条训练记录。 */

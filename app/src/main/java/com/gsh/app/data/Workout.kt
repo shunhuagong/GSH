@@ -103,22 +103,20 @@ interface TrainingEntryDao {
     @Query("SELECT * FROM training_entries WHERE date = :date ORDER BY id")
     fun observeByDate(date: String): Flow<List<TrainingEntry>>
 
-    @Query("SELECT * FROM training_entries WHERE exerciseId = :exerciseId ORDER BY id DESC LIMIT 1")
-    suspend fun lastOf(exerciseId: Long): TrainingEntry?
-
     @Insert
     suspend fun insert(entry: TrainingEntry): Long
 
-    @Insert
-    suspend fun insertAll(entries: List<TrainingEntry>)
-
-    /** 上次某动作的全部组（最近一个有训练日的条目，按入库顺序），多组带过用。 */
+    /**
+     * 指定日期之前、该动作最近一个有训练日的全部组（补录过去日期的带过用，
+     * 严格 < before，不受其后的记录污染；该日期之前无记录返回空）。
+     */
     @Query(
         "SELECT * FROM training_entries WHERE exerciseId = :exerciseId " +
-            "AND date = (SELECT MAX(date) FROM training_entries WHERE exerciseId = :exerciseId) " +
+            "AND date = (SELECT MAX(date) FROM training_entries " +
+            "WHERE exerciseId = :exerciseId AND date < :before) " +
             "ORDER BY id"
     )
-    suspend fun lastSetsOf(exerciseId: Long): List<TrainingEntry>
+    suspend fun lastSetsOfBefore(exerciseId: Long, before: String): List<TrainingEntry>
 
     @Query("DELETE FROM training_entries WHERE id = :id")
     suspend fun delete(id: Long)

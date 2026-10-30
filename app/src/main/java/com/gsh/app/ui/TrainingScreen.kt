@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,8 +69,12 @@ import com.gsh.app.data.TrainingEntry
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
-    val entries by vm.trainingToday.collectAsState()
+    val entries by vm.trainingOfDate.collectAsState()
     val exercises by vm.exercises.collectAsState()
+    val selectedDate by vm.selectedDate.collectAsState()
+    // 标题跟日期：今天显示"今日训练"，其他日期显示"MM-dd 训练"
+    val isToday = selectedDate == com.gsh.app.data.DateUtils.today()
+    val title = if (isToday) "🏋️ 今日训练" else "🏋️ ${selectedDate.substring(5)} 训练"
 
     // 待填组行（页面状态，不进库）：离开页面自然丢弃，空卡片零残留
     val pendingRows = remember { mutableStateListOf<PendingRow>() }
@@ -116,7 +121,7 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text("🏋️ 今日训练") },
+            title = { Text(title) },
             navigationIcon = {
                 IconButton(onClick = onDone) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -458,14 +463,16 @@ private fun PendingRowInline(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // 组号徽章
+        // 组号文字徽章：与已保存行「第 N 组」同语言，统一最小宽度保证左缘对齐
         Text(
-            "$setNo",
-            fontSize = 14.sp,
+            "第 $setNo 组",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
+                .widthIn(min = 56.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .padding(horizontal = 6.dp, vertical = 4.dp)
         )
         when (type) {
             Exercise.TYPE_STRENGTH -> {
@@ -498,7 +505,7 @@ private fun PendingRowInline(
     }
 }
 
-/** 行内数字输入框：placeholder 13sp、单位 suffix 印在框内右下角 11sp 灰字、数字右对齐。 */
+/** 行内数字输入框：placeholder 13sp、单位 suffix 印在框内右侧同基线、数字右对齐、56dp 高防裁切。 */
 @Composable
 private fun InlineNumField(
     value: String,
@@ -512,10 +519,10 @@ private fun InlineNumField(
         value = value,
         onValueChange = onValueChange,
         placeholder = { Text(placeholder, fontSize = 13.sp) },
-        suffix = { Text(unit, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        suffix = { Text(" $unit", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         singleLine = true,
         textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, textAlign = TextAlign.End),
-        modifier = modifier.height(44.dp)
+        modifier = modifier.height(56.dp)
     )
 }

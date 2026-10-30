@@ -120,8 +120,8 @@ fun TodayScreen(
     // 月历标记：有记录的日子按训练/休息显示 💪/😴
     val dayTypes by vm.dayTypes.collectAsState()
     val totals by vm.dailyTotals.collectAsState()
-    // 训练记录（今日入口：点击去训练页长组）
-    val trainingToday by vm.trainingToday.collectAsState()
+    // 训练记录（今日入口：跟随所选日期，翻历史日期显示那天的）
+    val trainingToday by vm.trainingOfDate.collectAsState()
     val exercises by vm.exercises.collectAsState()
 
     var editingEntry by remember { mutableStateOf<MealEntry?>(null) }

@@ -432,9 +432,10 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         repo.exerciseDao.observeAll()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** 今天的训练条目。 */
-    val trainingToday: StateFlow<List<TrainingEntry>> =
-        repo.trainingEntryDao.observeByDate(DateUtils.today())
+    /** 正在查看日期的训练条目（跟随 selectedDate：翻历史日期看/补录那天的）。 */
+    val trainingOfDate: StateFlow<List<TrainingEntry>> =
+        _selectedDate
+            .flatMapLatest { date -> repo.trainingEntryDao.observeByDate(date) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** 最近一次训练摘要（「我」页展示用）。 */
@@ -442,32 +443,9 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         repo.trainingEntryDao.observeLatestSummary()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** 上次某动作的记录，表单"上次带过"用。 */
-    suspend fun lastEntryOf(exerciseId: Long): TrainingEntry? = repo.lastEntryOf(exerciseId)
-
-    /** 上次某动作的全部组（多组卡片带过规则：第 N 组带上次第 N 组）。 */
-    suspend fun lastSetsOf(exerciseId: Long): List<TrainingEntry> = repo.lastSetsOf(exerciseId)
-
-    /** 多组卡片原子保存：一次入库全部组，当天自动标记训练日；取消则不调用、零残留。 */
-    fun saveTrainingEntries(
-        exerciseId: Long,
-        rows: List<Triple<Double?, Int?, Int?>>
-    ) {
-        viewModelScope.launch {
-            repo.saveTrainingEntries(
-                rows.map { (w, r, d) ->
-                    TrainingEntry(
-                        date = DateUtils.today(),
-                        exerciseId = exerciseId,
-                        weightKg = w,
-                        reps = r,
-                        durationMin = d,
-                        createdAt = System.currentTimeMillis()
-                    )
-                }
-            )
-        }
-    }
+    /** 上次某动作的全部组（第 N 组带上次第 N 组；只看选中日期之前，不含当天）。 */
+    suspend fun lastSetsOf(exerciseId: Long): List<TrainingEntry> =
+        repo.lastSetsOf(exerciseId, _selectedDate.value)
 
     /** 新增自定义动作（带记录方式），回调返回动作。 */
     fun addCustomExercise(name: String, muscleGroup: String, recordType: Int, onDone: (Exercise?) -> Unit) {
@@ -486,7 +464,7 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         }
     }
 
-    /** 添加一条训练记录；动作类型未设置（-1）时按所填组合实时判定写回。 */
+    /** 添加一条训练记录（落在正在查看的日期）；动作类型未设置时按所填组合实时判定写回。 */
     fun addTrainingEntry(
         exercise: Exercise,
         weightKg: Double?,
@@ -496,7 +474,7 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         viewModelScope.launch {
             repo.addTrainingEntryAndSettleType(
                 TrainingEntry(
-                    date = DateUtils.today(),
+                    date = _selectedDate.value,
                     exerciseId = exercise.id,
                     weightKg = weightKg,
                     reps = reps,
