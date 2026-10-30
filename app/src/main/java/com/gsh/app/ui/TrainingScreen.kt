@@ -17,9 +17,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,7 +41,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -288,7 +289,11 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
         }
     }
 }
-/** 动作选择：顶部部位类别条（默认"全部"）+ 只显示动作名的列表；底部整行宽「＋ 新建动作」入口。 */
+/**
+ * 动作选择（无标题，左右两栏）：左=竖排部位类别（全部/腿/背/胸/肩/臂/腹，
+ * 选中主题色文字+淡底高亮），右=该类别动作列表（只显示动作名；
+ * 多标签动作在其每个类别下都出现）；底部整行宽「＋ 新建动作」入口。
+ */
 @Composable
 private fun ExerciseSelectDialog(
     exercises: List<Exercise>,
@@ -301,34 +306,74 @@ private fun ExerciseSelectDialog(
     else exercises.filter { selectedGroup in it.muscleTags }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("选择动作") },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                // 部位类别条：点类别只显示带该标签的动作，多标签动作在多个类别下都出现
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(listOf("全部") + Exercise.GROUPS) { g ->
-                        FilterChip(
-                            selected = selectedGroup == g,
-                            onClick = { selectedGroup = g },
-                            label = { Text(g) }
-                        )
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-                if (shown.isEmpty()) {
-                    Text(
-                        "该部位还没有动作",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-                }
-                shown.forEach { e ->
-                    TextButton(
-                        onClick = { onPick(e) },
-                        modifier = Modifier.fillMaxWidth()
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)
+                ) {
+                    // 左栏：竖排类别，整行可点，选中淡底 + 主题色文字
+                    Column(
+                        modifier = Modifier
+                            .width(88.dp)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
                     ) {
-                        Text(e.name, fontSize = 15.sp)
+                        (listOf("全部") + Exercise.GROUPS).forEach { g ->
+                            val selected = selectedGroup == g
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp)
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                        else Color.Transparent
+                                    )
+                                    .clickable { selectedGroup = g },
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Text(
+                                    g,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 12.dp)
+                                )
+                            }
+                        }
+                    }
+                    // 浅灰分隔线
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.outlineVariant)
+                    )
+                    // 右栏：当前类别下的动作
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        if (shown.isEmpty()) {
+                            Text(
+                                "该部位还没有动作",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
+                            )
+                        }
+                        shown.forEach { e ->
+                            TextButton(
+                                onClick = { onPick(e) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(e.name, fontSize = 15.sp)
+                            }
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
