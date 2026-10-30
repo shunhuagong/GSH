@@ -7,6 +7,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,12 +25,14 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -56,7 +60,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gsh.app.data.Exercise
@@ -240,32 +243,27 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                                         row = row,
                                         setNo = savedSets.size + 1,
                                         // 保存即加入完成：待填行移除变已保存样式，不自动出现
-                                        // 下一待填行，练下一组由用户自己点「＋ 加一组」
-                                        onSaved = { pendingRows.remove(row) }
+                                        // 下一待填行，练下一组由用户自己点「＋」
+                                        onSaved = { pendingRows.remove(row) },
+                                        // ✕ 取消：丢弃待填行不写库；当天无已保存组时整卡随之消失
+                                        onDiscard = { pendingRows.remove(row) }
                                     )
                                 }
-                                // 无边框小胶囊加组：当前行合法先存，再出现下一行
+                                // 无边框小号「＋」：只负责开下一行，不自动保存当前待填行
+                                // （防预填数字被误存成一组）；有待填行时灰显，✓/✕ 处理完才恢复
                                 TextButton(
-                                    onClick = {
-                                        val row = pending
-                                        if (row != null) {
-                                            val parsed = parsePending(row, exercise.recordType)
-                                            if (parsed != null) {
-                                                savePending(vm, exercise, parsed)
-                                                pendingRows.remove(row)
-                                            }
-                                        }
-                                        addPendingRow(exerciseId)
-                                    },
+                                    onClick = { addPendingRow(exerciseId) },
+                                    enabled = pending == null,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(30.dp),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                                 ) {
                                     Text(
-                                        "＋ 加一组",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.primary
+                                        "＋",
+                                        fontSize = 14.sp,
+                                        color = if (pending == null) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -432,14 +430,15 @@ private fun savePending(vm: GshViewModel, exercise: Exercise, parsed: Triple<Dou
     vm.addTrainingEntry(exercise, parsed.first, parsed.second, parsed.third)
 }
 
-/** 待填组行：组号徽章 + 行内小输入框（单位印在框内右下角小字）+ ✓ 保存该组。 */
+/** 待填组行：组号徽章 + 行内小输入框（单位印框内、无提示词）+ ✕ 取消 + ✓ 保存该组。 */
 @Composable
 private fun PendingRowInline(
     vm: GshViewModel,
     exercise: Exercise,
     row: PendingRow,
     setNo: Int,
-    onSaved: () -> Unit
+    onSaved: () -> Unit,
+    onDiscard: () -> Unit
 ) {
     // 行出现时预填上次第 N 组（不足带上一组，无历史留空）
     LaunchedEffect(row) {
@@ -474,53 +473,85 @@ private fun PendingRowInline(
         )
         when (type) {
             Exercise.TYPE_STRENGTH -> {
-                InlineNumField(row.weight, { row.weight = it }, "重量", "kg", KeyboardType.Decimal, Modifier.width(76.dp))
-                InlineNumField(row.reps, { row.reps = it }, "次数", "次", KeyboardType.Number, Modifier.width(64.dp))
+                InlineNumField(row.weight, { row.weight = it }, "kg", KeyboardType.Decimal, Modifier.width(72.dp))
+                InlineNumField(row.reps, { row.reps = it }, "次", KeyboardType.Number, Modifier.width(56.dp))
+                Spacer(Modifier.weight(1f))
             }
             Exercise.TYPE_REPS -> {
-                InlineNumField(row.reps, { row.reps = it }, "次数", "次", KeyboardType.Number, Modifier.weight(1f))
+                InlineNumField(row.reps, { row.reps = it }, "次", KeyboardType.Number, Modifier.weight(1f))
             }
             Exercise.TYPE_DURATION -> {
-                InlineNumField(row.duration, { row.duration = it }, "时长", "分钟", KeyboardType.Number, Modifier.weight(1f))
+                InlineNumField(row.duration, { row.duration = it }, "分钟", KeyboardType.Number, Modifier.weight(1f))
             }
             else -> {
                 // 存量未定类型：三框兼容，首次保存后类型固定
-                InlineNumField(row.weight, { row.weight = it }, "重量", "kg", KeyboardType.Decimal, Modifier.width(68.dp))
-                InlineNumField(row.reps, { row.reps = it }, "次数", "次", KeyboardType.Number, Modifier.width(60.dp))
-                InlineNumField(row.duration, { row.duration = it }, "时长", "分", KeyboardType.Number, Modifier.width(60.dp))
+                InlineNumField(row.weight, { row.weight = it }, "kg", KeyboardType.Decimal, Modifier.width(72.dp))
+                InlineNumField(row.reps, { row.reps = it }, "次", KeyboardType.Number, Modifier.width(56.dp))
+                InlineNumField(row.duration, { row.duration = it }, "分钟", KeyboardType.Number, Modifier.width(64.dp))
+                Spacer(Modifier.weight(1f))
             }
         }
-        IconButton(
-            onClick = {
-                parsed?.let { savePending(vm, exercise, it) }
-                onSaved()
-            },
-            enabled = parsed != null,
-            modifier = Modifier.size(32.dp)
+        // ✕ 取消 + ✓ 保存：钉在行右缘，与已保存行垃圾桶同一竖线，两按钮间 4dp
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Icon(Icons.Filled.Check, contentDescription = "保存该组")
+            IconButton(onClick = onDiscard, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Outlined.Close, contentDescription = "取消该组")
+            }
+            IconButton(
+                onClick = {
+                    parsed?.let { savePending(vm, exercise, it) }
+                    onSaved()
+                },
+                enabled = parsed != null,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(Icons.Filled.Check, contentDescription = "保存该组")
+            }
         }
     }
 }
 
-/** 行内数字输入框：placeholder 13sp、单位 suffix 印在框内右侧同基线、数字右对齐、56dp 高防裁切。 */
+/**
+ * 行内数字输入框：无提示词（单位即说明）、48dp 高、8dp 横向内边距、单位印框内
+ * 右侧同基线、数字右对齐。M3 的 OutlinedTextField 无 contentPadding 参数，
+ * 需求文档的紧凑尺寸/内边距用 BasicTextField 自绘实现（聚焦时描边加亮）。
+ */
 @Composable
 private fun InlineNumField(
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String,
     unit: String,
     keyboardType: KeyboardType,
     modifier: Modifier
 ) {
-    OutlinedTextField(
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    val borderColor = if (focused) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.outline
+    BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder, fontSize = 13.sp) },
-        suffix = { Text(" $unit", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         singleLine = true,
-        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, textAlign = TextAlign.End),
-        modifier = modifier.height(56.dp)
+        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
+        interactionSource = interactionSource,
+        decorationBox = { innerField ->
+            Row(
+                modifier = modifier
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .border(1.dp, borderColor, RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    innerField()
+                }
+                Text(unit, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     )
 }
