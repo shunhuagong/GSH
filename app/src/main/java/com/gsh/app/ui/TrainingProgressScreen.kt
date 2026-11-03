@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -35,6 +37,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.gsh.app.R
 import com.gsh.app.data.DateUtils
 import java.time.LocalDate
 
@@ -109,11 +115,22 @@ fun TrainingProgressScreen(vm: GshViewModel, onDone: () -> Unit) {
                                     }
                                 }
                                 if (data.isRecord) {
-                                    Text(
-                                        "🔥 新纪录",
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
+                                    // 奖牌动画播一次后定格在最后一帧
+                                    val medalComposition by rememberLottieComposition(
+                                        LottieCompositionSpec.RawRes(R.raw.medal_animation)
                                     )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        LottieAnimation(
+                                            composition = medalComposition,
+                                            modifier = Modifier.size(40.dp)
+                                        )
+                                        Spacer(Modifier.width(2.dp))
+                                        Text(
+                                            "新纪录",
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
                                 }
                             }
                             data.diffText?.let {

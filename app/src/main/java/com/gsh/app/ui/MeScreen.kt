@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -50,6 +51,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.rememberLottieComposition
 import com.gsh.app.R
 import com.gsh.app.data.DateUtils
 import com.gsh.app.data.Photo
@@ -292,11 +297,22 @@ fun MeScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "🏋️ 训练",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val fitnessComposition by rememberLottieComposition(
+                        LottieCompositionSpec.RawRes(R.raw.fitness)
+                    )
+                    LottieAnimation(
+                        composition = fitnessComposition,
+                        iterations = LottieConstants.IterateForever,
+                        modifier = Modifier.size(30.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "训练",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(
                     latestWorkout?.let { w ->

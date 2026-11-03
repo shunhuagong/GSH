@@ -13,11 +13,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,7 +32,6 @@ import com.gsh.app.data.DateUtils
 import com.gsh.app.data.Photo
 
 /** 「变化」页：按时间线记录体型照片，前后对比身材变化。 */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BodyScreen(vm: GshViewModel) {
     val photos by vm.bodyPhotos.collectAsState()
@@ -60,7 +57,7 @@ fun BodyScreen(vm: GshViewModel) {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(title = { Text("变化") })
+        ScreenTitle("变化")
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)

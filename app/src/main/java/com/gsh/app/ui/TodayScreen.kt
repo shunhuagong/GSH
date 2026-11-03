@@ -55,6 +55,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.gsh.app.R
 import com.gsh.app.ai.AiUiState
 import com.gsh.app.data.DateUtils
 import com.gsh.app.data.Exercise
@@ -255,12 +260,25 @@ fun TodayScreen(
                     .padding(top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "今日饮食",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
-                )
+                ) {
+                    val menuComposition by rememberLottieComposition(
+                        LottieCompositionSpec.RawRes(R.raw.main_menu)
+                    )
+                    LottieAnimation(
+                        composition = menuComposition,
+                        iterations = LottieConstants.IterateForever,
+                        modifier = Modifier.size(30.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "今日饮食",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 if (date == DateUtils.today()) {
                     TextButton(onClick = onCopyClick) {
                         Text("复制饮食", fontSize = 13.sp)

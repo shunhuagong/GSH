@@ -84,4 +84,5 @@ dependencies {
 
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation("com.airbnb.android:lottie-compose:6.5.2")
 }

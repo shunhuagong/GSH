@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,7 +22,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -31,7 +31,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,7 +48,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gsh.app.data.Food
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FoodLibraryScreen(vm: GshViewModel) {
     val foods by vm.foods.collectAsState()
@@ -61,6 +59,9 @@ fun FoodLibraryScreen(vm: GshViewModel) {
     LaunchedEffect(Unit) { vm.setSearchQuery("") }
 
     Scaffold(
+        // 去掉默认 contentWindowInsets 的状态栏/导航栏内边距（外层 GshApp 已处理），
+        // 与「历史」「变化」页头部高度对齐
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAddDialog = true },
@@ -74,7 +75,7 @@ fun FoodLibraryScreen(vm: GshViewModel) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            TopAppBar(title = { Text("食物库") })
+            ScreenTitle("食物库")
             OutlinedTextField(
                 value = query,
                 onValueChange = vm::setSearchQuery,
