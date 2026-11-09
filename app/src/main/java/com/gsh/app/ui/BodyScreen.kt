@@ -11,11 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -29,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -56,7 +56,8 @@ fun BodyScreen(vm: GshViewModel) {
                 fileOf = vm::photoFile,
                 captionOf = { DateUtils.display(it.date) },
                 onDelete = { photo -> vm.deletePhoto(photo) },
-                onDismiss = { viewingPhoto = null }
+                onDismiss = { viewingPhoto = null },
+                zoomable = true
             )
         }
     }
@@ -115,19 +116,21 @@ fun BodyScreen(vm: GshViewModel) {
                                         color = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    // 当天照片超过可见的 3 张：日期行右端 20dp 灰圆角标提示未显示张数
+                                    // 当天照片超过可见的 3 张：日期行右端角标提示未显示张数
+                                    // 黑色40%透明胶囊底（高20dp、宽随文字自适应，两位数如+10也完整）+白字10sp不加粗
                                     if (dayPhotos.size > 3) {
                                         Box(
                                             modifier = Modifier
-                                                .size(20.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                                .height(20.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color.Black.copy(alpha = 0.4f))
+                                                .padding(horizontal = 5.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
                                                 "+${dayPhotos.size - 3}",
                                                 fontSize = 10.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                color = Color.White,
                                                 maxLines = 1
                                             )
                                         }
