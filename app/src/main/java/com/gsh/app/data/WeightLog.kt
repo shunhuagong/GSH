@@ -9,14 +9,17 @@ import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 体重记录：一天一条（重复记录当天覆盖）。
- * 记录同时会同步更新设置里的体重，营养目标随之变化。
+ * 身体记录（原体重记录）：一天一条（重复记录当天覆盖）。
+ * 体重 kg、骨骼肌 kg（体重必填；体脂率 %、骨骼肌 kg 可选，没测为 null，禁止存 0）。
+ * 与设置页 profile 体重是两回事：本表只做记录与趋势展示，不同步营养目标。
  */
 @Entity(tableName = "weight_logs")
 data class WeightLog(
     @PrimaryKey val date: String,   // yyyy-MM-dd
     val weightKg: Double,
-    val createdAt: Long
+    val createdAt: Long,
+    val bodyFat: Double? = null,     // 体脂率 %
+    val muscleKg: Double? = null     // 骨骼肌 kg
 )
 
 @Dao

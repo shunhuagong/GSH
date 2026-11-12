@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Food::class, MealEntry::class, DayType::class, Photo::class, WeightLog::class,
         Exercise::class, TrainingEntry::class
     ],
-    version = 9,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -127,6 +127,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v9 → v10：身体趋势指标——weight_logs 加体脂率 bodyFat、骨骼肌率 muscleRate
+         * 两列（均可空）。单条加列保持所有数据，存量体重记录两列自动为 null。
+         */
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `weight_logs` ADD COLUMN `bodyFat` REAL")
+                db.execSQL("ALTER TABLE `weight_logs` ADD COLUMN `muscleRate` REAL")
+            }
+        }
+
+        /**
+         * v10 → v11：骨骼肌单位拍板由 % 改为 kg——列改名 muscleRate → muscleKg，
+         * 数据不清（随后用户口径的整体重置在应用层做）。RENAME COLUMN 需
+         * SQLite 3.25+/较新系统，与 v8→v9 同一要求。
+         */
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `weight_logs` RENAME COLUMN `muscleRate` TO `muscleKg`")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -136,7 +158,8 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                     .addMigrations(
                         MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                        MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9
+                        MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
+                        MIGRATION_10_11
                     )
                     // 手机里已有真实数据：迁移缺失/失败必须抛错暴露，绝不静默清库重建
                     .build()

@@ -164,7 +164,8 @@ fun GshApp(vm: GshViewModel = viewModel(factory = GshViewModel.Factory)) {
                         vm = vm,
                         onOpenSettings = { navController.navigate("settings") },
                         onOpenWorkout = { navController.navigate("training") },
-                        onOpenProgress = { navController.navigate("progress") }
+                        onOpenProgress = { navController.navigate("progress") },
+                        onOpenBodyTrend = { navController.navigate("body_trend") }
                     )
                 }
                 // 训练记录页（逐条添加模式，从「我」页/今日页进入）
@@ -174,6 +175,10 @@ fun GshApp(vm: GshViewModel = viewModel(factory = GshViewModel.Factory)) {
                 // 训练进步看板（「我」页进入）
                 composable("progress") {
                     TrainingProgressScreen(vm = vm, onDone = { navController.popBackStack() })
+                }
+                // 身体趋势页（「我」页入口卡进入：体重/体脂率/骨骼肌折线）
+                composable("body_trend") {
+                    BodyTrendScreen(vm = vm, onDone = { navController.popBackStack() })
                 }
                 // 设置改为「我」页进入的二级页（不显示底部导航）
                 composable("settings") {

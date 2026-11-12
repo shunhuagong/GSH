@@ -8,7 +8,7 @@
 记录饮食 → 换算蛋白/碳水/脂肪 → 与"体重×每公斤系数"的目标对比 → AI 分析。
 
 - 语言/UI：Kotlin 2.0.21 + Jetpack Compose（Material 3，BOM 2024.12.01）
-- 数据：Room（`gsh.db`，version 9）+ SharedPreferences（SettingsStore）
+- 数据：Room（`gsh.db`，version 11）+ SharedPreferences（SettingsStore）
 - 构建：Gradle 8.11.1 / AGP 8.7.3，compileSdk 35，minSdk 26，Java 17
 - 当前版本：versionName 2.2 / versionCode 13
 
@@ -57,7 +57,8 @@ ui/
 ├── Photos                # 拍照/相册选图启动器（免权限方案）+ 全屏大图查看器 + 缩略图
 ├── CopyMealScreen        # 全屏月历复制页（只能从历史拉到今天）
 ├── AddEntryScreen / FoodLibraryScreen / HistoryScreen / SettingsScreen
-├── MeScreen              # 「我」页：头像（默认插画，+ 角标相册换图）+ 右上角齿轮进设置（二级页）+ 🔥近30天成绩（打卡/蛋白达标/训练日，训练日按全局口径：未标记即训练日）+ ⚖️体重卡（当前值+较上次变化+近90天 Canvas 折线+记体重弹窗，记录同步更新 profile 体重与营养目标）
+├── MeScreen              # 「我」页：头像（默认插画，+ 角标相册换图）+ 右上角齿轮进设置（二级页）+ 🔥近30天成绩（打卡/蛋白达标/训练日/休息日）+ 📊身体趋势入口卡 + 训练摘要区（🏋️动画+记训练/查看训练进步入口）；⚖️体重卡已于 11-09 移除（身体记录归身体趋势页，不再同步 profile）
+├── BodyTrendScreen       # 身体趋势页（「我」页进入）：体重/体脂率/骨骼肌三 tab Canvas 折线（参考值虚线 30/60/90・10/15/20・25/30/35、点标数值、底部日期行）、90 天窗口翻页箭头越界置灰、＋记录弹窗（体重必填其余可选，≤0 存 null，只记当天，同日覆盖）
 ├── AvatarCrop            # 头像裁剪全屏界面：捏合=图片中心缩放（手势会话锁）、单指拖动=平移、双指平移=跟手；确认才落库；⚠️ 图片渲染用 Canvas 直绘（translate+scale+drawImage），勿改回 Image+offset+size 布局方案（部分机型 Dialog 全屏下渲染错位）；解码含 EXIF 转正/透明铺白/纯色底板自动裁边
 └── ConfettiOverlay / AiAnalysisSheet / Theme（含 ProteinColor/CarbsColor/FatColor 固定色）
 ```
@@ -109,5 +110,6 @@ ui/
 | v2.2 追加三 (code 13) | 编辑动作（名称+部位标签，零迁移）：选择对话框右栏行尾加 ✎（16dp 小图标灰显弱化存在感、32dp 热区防误触，行身仍选动作）；编辑框复用新建样式（名称重名校验排除自身、部位多选至少一个、「编辑动作/保存」、recordType 不可改不显示）；DAO 按字段 UPDATE（不动 isCustom/recordType），training_entries 只存 id——改名后今日页/历史摘要/看板引用式跟随新名，历史训练行一行未动；明确不做：删除动作、编辑已录成绩。验收清单由用户装机自验（执行 AI 仅验证编译/安装/启动无崩溃） |
 | v2.2 追加四 (code 13) | Lottie 动画落地（**跨电脑协作**：另一台机器开发、用户已实测通过，本地同步提交）：lottie-compose 6.5.2；「我」页训练标题=哑铃弯举动画 30dp 无限循环、「今日饮食」标题=main_menu 30dp 无限循环、看板新纪录角标=奖牌动画 40dp **播一次定格**（拍板：常驻动画无限循环、一次性场景播完定格）；Theme.kt 新增共用 `ScreenTitle` 紧凑页头（statusBarsPadding+贴顶10dp），历史/变化/食物库三页统一替换 TopAppBar；构建配置加腾讯云镜像源 + overridePathCheck（中文路径机器兼容）；lottie 素材目录与需求文档纳入 git（换电脑不再靠 zip 搬运，keystore 仍除外） |
 | v2.2 追加五 (code 13) | 「变化」页照片组角标（需求文档/需求文档-变化页面-图像数量显示.md）：当天照片 >3 张时，日期行右端 20dp 灰圆显示「+未显示张数」（4张→+1、5张→+2，≤3 不显示）；颜色与训练页组号徽章同语言（surfaceVariant 底 + onSurfaceVariant 字）；添加照片逻辑与其他页面未动 |
+| v2.2 追加六 (code 13) | **身体趋势页**（需求文档/需求文档-身体趋势页.md；最终拍板：骨骼肌 kg、纵轴自适应、入口整卡进页、每点标日期）：Room v9→v10→v11（weight_logs 加 bodyFat/muscleKg 两列，骨骼肌列 v10→v11 由 % 改 kg 改名 muscleKg）；「我」页「📊 身体趋势」入口卡 → 二级页 body_trend：体重/体脂率/骨骼肌三胶囊 tab、Canvas 折线（数值标注点上方+日期统一标图表底部、渐变填充、自适应纵轴）、90 天窗口箭头翻页越界置灰、「＋记录」弹窗（体重必填/其余可选，没测或≤0 存 null，同日覆盖，只记当天）；**不碰 profile 体重**（营养目标独立，旧 recordWeight 已删）；2026-11-12 用户口径：清空旧体重数据重种 10-14/15/16 三条新记录（一次性种子已移除） |
+| v2.2 追加七 (code 13) | **历史锁定机制**（用户 2026-11-09 拍板 A+B）：超过 7 天（`HISTORY_LOCK_DAYS=7`）的日期只读——饮食条目/餐次照片/训练条目的增删改全拦（VM `isDateLocked()` 单一闸口 + 训练删除前 byId 查日期双保险），锁定日 TodayScreen/TrainingScreen 隐藏或禁用全部入口并显示🔒提示；7 天内历史日期删除弹确认框（当天删除保持直接删）；训练成绩数字不可改只能删重记（既有约定）；设置页 profile 体重与营养目标不受影响 |
 
-（2026-10-16 之后的功能改动请追加到本表）

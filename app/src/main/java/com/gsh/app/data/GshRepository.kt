@@ -56,12 +56,21 @@ class GshRepository(context: Context) {
     }
 
     /** 记录体重（当天重复记则覆盖），并同步更新设置里的体重，营养目标随之变化。 */
-    suspend fun recordWeight(date: String, weightKg: Double) {
-        weightLogDao.upsert(WeightLog(date, weightKg, System.currentTimeMillis()))
-        val p = settings.profile.value
-        if (p.weightKg != weightKg) {
-            settings.updateProfile(p.copy(weightKg = weightKg))
-        }
+    /**
+     * 保存当天的身体记录（体重/体脂率/骨骼肌），同日重复 = 覆盖。
+     * 空值口径：没测或 <=0 一律存 null（禁止 0 入库，防折线掉地板）。
+     * 不同步 profile 体重——营养目标（体重×系数）是另一套，见需求文档约束 2。
+     */
+    suspend fun saveBodyMetric(date: String, weightKg: Double, bodyFat: Double?, muscleKg: Double?) {
+        weightLogDao.upsert(
+            WeightLog(
+                date = date,
+                weightKg = weightKg,
+                createdAt = System.currentTimeMillis(),
+                bodyFat = bodyFat?.takeIf { it > 0 },
+                muscleKg = muscleKg?.takeIf { it > 0 }
+            )
+        )
     }
 
     // ---------- 训练记录 ----------

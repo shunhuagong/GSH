@@ -310,8 +310,9 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
 
     fun photoFile(photo: Photo): File = repo.photoFile(photo)
 
-    /** 保存餐次照片；tempFile 为拍照临时文件，导入完成后清理。 */
+    /** 保存餐次照片；tempFile 为拍照临时文件，导入完成后清理。锁定日期不可补录。 */
     fun addMealPhoto(uri: Uri, mealType: Int, tempFile: File?) {
+        if (isDateLocked(_selectedDate.value)) return
         viewModelScope.launch {
             repo.savePhoto(uri, Photo.KIND_MEAL, _selectedDate.value, mealType)
             tempFile?.let { runCatching { it.delete() } }
@@ -340,17 +341,24 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         _selectedDate.value = date
     }
 
+    /** 该日期是否已被历史锁定：超过 HISTORY_LOCK_DAYS 天以前的记录只读（不可删/改/补录），防篡改历史。 */
+    fun isDateLocked(date: String): Boolean =
+        date < DateUtils.format(DateUtils.parse(DateUtils.today()).minusDays(HISTORY_LOCK_DAYS))
+
     fun addEntry(food: Food, amount: Double, mealType: Int) {
+        if (isDateLocked(_selectedDate.value)) return
         viewModelScope.launch {
             repo.addEntry(food, amount, mealType, _selectedDate.value)
         }
     }
 
     fun deleteEntry(entry: MealEntry) {
+        if (isDateLocked(entry.date)) return
         viewModelScope.launch { repo.mealEntryDao.delete(entry) }
     }
 
     fun updateEntryAmount(entry: MealEntry, amount: Double) {
+        if (isDateLocked(entry.date)) return
         viewModelScope.launch { repo.updateEntryAmount(entry, amount) }
     }
 
@@ -415,14 +423,14 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
 
     // ---------- 体重历史 ----------
 
-    /** 全部体重记录，旧日期在前。 */
+    /** 全部身体记录（旧日期在前）：身体趋势页折线数据源（体重/体脂率/骨骼肌率三指标）。 */
     val weightLogs: StateFlow<List<WeightLog>> =
         repo.weightLogDao.observeAll()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** 记录今日体重（重复记则覆盖），并同步更新设置里的体重。 */
-    fun recordWeight(weightKg: Double) {
-        viewModelScope.launch { repo.recordWeight(DateUtils.today(), weightKg) }
+    /** 保存当天的身体记录（体重必填、体脂/骨骼肌可选；<=0 归 null）。本版只记当天、不做历史补录。 */
+    fun saveBodyMetric(weightKg: Double, bodyFat: Double?, muscleKg: Double?) {
+        viewModelScope.launch { repo.saveBodyMetric(DateUtils.today(), weightKg, bodyFat, muscleKg) }
     }
 
     // ---------- 训练记录（逐条添加，对齐饮食模式） ----------
@@ -502,6 +510,7 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
         reps: Int?,
         durationSec: Int?
     ) {
+        if (isDateLocked(_selectedDate.value)) return
         viewModelScope.launch {
             repo.addTrainingEntryAndSettleType(
                 TrainingEntry(
@@ -518,7 +527,11 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
     }
 
     fun deleteTrainingEntry(id: Long) {
-        viewModelScope.launch { repo.deleteTrainingEntry(id) }
+        viewModelScope.launch {
+            val entry = repo.trainingEntryDao.byId(id) ?: return@launch
+            if (isDateLocked(entry.date)) return@launch
+            repo.deleteTrainingEntry(id)
+        }
     }
 
     // ---------- 训练进步看板 ----------
@@ -616,6 +629,9 @@ class GshViewModel(private val repo: GshRepository) : ViewModel() {
     }
 
     companion object {
+        /** 历史锁定天数：超过 N 天以前的日期只读（不可删/改/补录），防篡改历史记录。 */
+        const val HISTORY_LOCK_DAYS = 7L
+
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
