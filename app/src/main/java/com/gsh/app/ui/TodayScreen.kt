@@ -130,10 +130,15 @@ fun TodayScreen(
     val exercises by vm.exercises.collectAsState()
 
     var editingEntry by remember { mutableStateOf<MealEntry?>(null) }
+    var confirmingDelete by remember { mutableStateOf<MealEntry?>(null) }
     var celebrationTick by remember { mutableStateOf(0) }
     var celebrated by remember { mutableStateOf(false) }
     var pendingPhotoMeal by remember { mutableStateOf<Int?>(null) }
     var viewingPhoto by remember { mutableStateOf<Photo?>(null) }
+
+    // 历史锁定（方案B）：超过 7 天的日期只读；删除确认（方案A）：仅历史日期弹确认，当天直接删
+    val locked = vm.isDateLocked(date)
+    val isToday = date == DateUtils.today()
 
     // 拍照/选图回调：从上下文取出待打卡的餐次，交给仓库导入
     val photoLaunchers = rememberPhotoLaunchers { uri, tempFile ->
@@ -173,6 +178,26 @@ fun TodayScreen(
             onSave = { amount ->
                 vm.updateEntryAmount(entry, amount)
                 editingEntry = null
+            }
+        )
+    }
+
+    // 历史日期（7 天内）的删除确认：当天直接删、锁定日期入口已隐藏
+    confirmingDelete?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { confirmingDelete = null },
+            title = { Text("删除历史记录") },
+            text = {
+                Text("${DateUtils.display(entry.date)} 的「${entry.foodName}」删除后无法恢复，确认删除？")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.deleteEntry(entry)
+                    confirmingDelete = null
+                }) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingDelete = null }) { Text("取消") }
             }
         )
     }
@@ -235,6 +260,16 @@ fun TodayScreen(
                 onChange = { vm.setDayType(date, it) }
             )
         }
+        if (locked) {
+            item {
+                Text(
+                    "🔒 超过 ${GshViewModel.HISTORY_LOCK_DAYS} 天的历史记录已锁定（只读，不可删改补录）",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
         if (isTrainingDay) {
             item {
                 TrainingTodayRow(
@@ -293,11 +328,17 @@ fun TodayScreen(
                     mealType = mealType,
                     entries = mealEntries,
                     photos = mealPhotos.filter { it.mealType == mealType },
+                    canEdit = !locked,
                     onAdd = { onAddClick(mealType) },
                     onPhoto = { pendingPhotoMeal = mealType },
                     onViewPhoto = { viewingPhoto = it },
                     photoFile = vm::photoFile,
-                    onDelete = vm::deleteEntry,
+                    onDelete = { entry ->
+                        when {
+                            isToday -> vm.deleteEntry(entry)
+                            else -> confirmingDelete = entry
+                        }
+                    },
                     onEdit = { editingEntry = it }
                 )
             }
@@ -496,6 +537,7 @@ private fun MealSection(
     mealType: Int,
     entries: List<MealEntry>,
     photos: List<Photo>,
+    canEdit: Boolean,
     onAdd: () -> Unit,
     onPhoto: () -> Unit,
     onViewPhoto: (Photo) -> Unit,
@@ -510,10 +552,11 @@ private fun MealSection(
                 .padding(horizontal = 14.dp, vertical = 10.dp)
                 .animateContentSize()
         ) {
+            // 锁定日期（canEdit=false）：标题行只读，不出现拍照/添加入口
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onAdd),
+                    .then(if (canEdit) Modifier.clickable(onClick = onAdd) else Modifier),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(mealEmoji(mealType), fontSize = 16.sp)
@@ -524,21 +567,23 @@ private fun MealSection(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
-                Icon(
-                    Icons.Outlined.PhotoCamera,
-                    contentDescription = "拍摄${MealEntry.mealName(mealType)}照片",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .clickable { onPhoto() }
-                        .padding(6.dp)
-                        .size(20.dp)
-                )
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    Icons.Filled.Add,
-                    contentDescription = "添加${MealEntry.mealName(mealType)}",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                if (canEdit) {
+                    Icon(
+                        Icons.Outlined.PhotoCamera,
+                        contentDescription = "拍摄${MealEntry.mealName(mealType)}照片",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { onPhoto() }
+                            .padding(6.dp)
+                            .size(20.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = "添加${MealEntry.mealName(mealType)}",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             if (photos.isNotEmpty()) {
                 LazyRow(
@@ -555,18 +600,20 @@ private fun MealSection(
                 }
             }
             if (entries.isEmpty()) {
-                Text(
-                    text = "＋ 点击添加${MealEntry.mealName(mealType)}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onAdd)
-                        .padding(top = 6.dp)
-                )
+                if (canEdit) {
+                    Text(
+                        text = "＋ 点击添加${MealEntry.mealName(mealType)}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onAdd)
+                            .padding(top = 6.dp)
+                    )
+                }
             } else {
                 entries.forEach { entry ->
-                    MealEntryRow(entry = entry, onEdit = { onEdit(entry) }, onDelete = onDelete)
+                    MealEntryRow(entry = entry, canEdit = canEdit, onEdit = { onEdit(entry) }, onDelete = onDelete)
                 }
             }
         }
@@ -581,11 +628,11 @@ private fun mealEmoji(type: Int): String = when (type) {
 }
 
 @Composable
-private fun MealEntryRow(entry: MealEntry, onEdit: () -> Unit, onDelete: (MealEntry) -> Unit) {
+private fun MealEntryRow(entry: MealEntry, canEdit: Boolean, onEdit: () -> Unit, onDelete: (MealEntry) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onEdit)
+            .then(if (canEdit) Modifier.clickable(onClick = onEdit) else Modifier)
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -599,12 +646,14 @@ private fun MealEntryRow(entry: MealEntry, onEdit: () -> Unit, onDelete: (MealEn
             )
         }
         Spacer(Modifier.width(8.dp))
-        IconButton(onClick = { onDelete(entry) }) {
-            Icon(
-                Icons.Outlined.Delete,
-                contentDescription = "删除",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        if (canEdit) {
+            IconButton(onClick = { onDelete(entry) }) {
+                Icon(
+                    Icons.Outlined.Delete,
+                    contentDescription = "删除",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

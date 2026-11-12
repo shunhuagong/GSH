@@ -128,6 +128,9 @@ interface TrainingEntryDao {
     @Insert
     suspend fun insert(entry: TrainingEntry): Long
 
+    @Query("SELECT * FROM training_entries WHERE id = :id LIMIT 1")
+    suspend fun byId(id: Long): TrainingEntry?
+
     /**
      * 指定日期之前、该动作最近一个有训练日的全部组（补录过去日期的带过用，
      * 严格 < before，不受其后的记录污染；该日期之前无记录返回空）。

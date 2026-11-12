@@ -84,6 +84,8 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
     // 标题跟日期：今天显示"今日训练"，其他日期显示"MM-dd 训练"
     val isToday = selectedDate == com.gsh.app.data.DateUtils.today()
     val title = if (isToday) "🏋️ 今日训练" else "🏋️ ${selectedDate.substring(5)} 训练"
+    // 历史锁定（方案B）：超过 7 天的日期只读；删除确认（方案A）仅历史日期
+    val locked = vm.isDateLocked(selectedDate)
 
     // 待填组行（页面状态，不进库）：离开页面自然丢弃，空卡片零残留
     val pendingRows = remember { mutableStateListOf<PendingRow>() }
@@ -92,11 +94,32 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
     var showPicker by remember { mutableStateOf(false) }
     var showNewExercise by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<Exercise?>(null) }
+    var confirmingDeleteId by remember { mutableStateOf<Long?>(null) }
 
     fun addPendingRow(exerciseId: Long) {
         if (pendingRows.none { it.exerciseId == exerciseId }) {
             pendingRows.add(PendingRow(exerciseId))
         }
+    }
+
+    // 历史日期（7 天内）的删除确认：当天直接删、锁定日期入口已禁用
+    confirmingDeleteId?.let { id ->
+        AlertDialog(
+            onDismissRequest = { confirmingDeleteId = null },
+            title = { Text("删除历史记录") },
+            text = {
+                Text("${com.gsh.app.data.DateUtils.display(selectedDate)} 的这一组训练记录删除后无法恢复，确认删除？")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.deleteTrainingEntry(id)
+                    confirmingDeleteId = null
+                }) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingDeleteId = null }) { Text("取消") }
+            }
+        )
     }
 
     if (showPicker) {
@@ -159,7 +182,15 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                 .padding(horizontal = 16.dp)
         ) {
             val cardIds = (entries.groupBy { it.exerciseId }.keys + pendingRows.map { it.exerciseId }).distinct()
-            if (cardIds.isEmpty()) {
+            if (locked) {
+                Text(
+                    "🔒 超过 ${GshViewModel.HISTORY_LOCK_DAYS} 天的历史记录已锁定（只读，不可删改补录）",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+            if (cardIds.isEmpty() && !locked) {
                 Text(
                     "还没有训练记录，点下方按钮选动作开始",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -245,7 +276,14 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                                             modifier = Modifier.weight(1f)
                                         )
                                         IconButton(
-                                            onClick = { vm.deleteTrainingEntry(entry.id) },
+                                            onClick = {
+                                                when {
+                                                    locked -> {}
+                                                    isToday -> vm.deleteTrainingEntry(entry.id)
+                                                    else -> confirmingDeleteId = entry.id
+                                                }
+                                            },
+                                            enabled = !locked,
                                             modifier = Modifier.size(32.dp)
                                         ) {
                                             Icon(
@@ -271,10 +309,10 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
                                     )
                                 }
                                 // 无边框小号「＋」：只负责开下一行，不自动保存当前待填行
-                                // （防预填数字被误存成一组）；有待填行时灰显，✓/✕ 处理完才恢复
+                                // （防预填数字被误存成一组）；有待填行或日期锁定时灰显
                                 TextButton(
                                     onClick = { addPendingRow(exerciseId) },
-                                    enabled = pending == null,
+                                    enabled = pending == null && !locked,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(30.dp),
@@ -295,6 +333,7 @@ fun TrainingScreen(vm: GshViewModel, onDone: () -> Unit) {
             Spacer(Modifier.height(16.dp))
             OutlinedButton(
                 onClick = { showPicker = true },
+                enabled = !locked,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(36.dp)
